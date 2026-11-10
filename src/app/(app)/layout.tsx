@@ -1,8 +1,9 @@
+import { Bell, Landmark, Plus, Search, Settings } from "lucide-react";
 import Link from "next/link";
 import { Suspense } from "react";
-import { primaryButtonClass, textButtonClass } from "@/components/ui";
+import { loadShellData } from "@/lib/shell";
 import { signOut } from "../login/actions";
-import { Nav } from "./nav";
+import { MobileNav, Sidebar } from "./sidebar";
 
 export default function AppLayout({
   children,
@@ -11,41 +12,116 @@ export default function AppLayout({
 }) {
   return (
     <div className="min-h-screen md:flex">
-      <aside className="flex flex-col gap-3 bg-surface p-4 md:sticky md:top-0 md:h-screen md:w-60 md:shrink-0 md:gap-5 md:p-5">
-        <div className="flex items-center justify-between">
-          <Link href="/dashboard" className="text-lg font-semibold tracking-tight">
+      <Suspense fallback={<div className="hidden w-64 shrink-0 bg-surface md:block" />}>
+        <SidebarWithData />
+      </Suspense>
+
+      <div className="min-w-0 flex-1">
+        <header className="flex items-center gap-3 px-4 py-4 md:px-8 md:py-6">
+          <Link href="/dashboard" className="text-lg font-bold tracking-tight md:hidden">
             finance-bet
           </Link>
-          <form action={signOut} className="md:hidden">
-            <button type="submit" className={textButtonClass}>
-              Sair
-            </button>
+          <form
+            action="/lancamentos"
+            role="search"
+            className="hidden w-full max-w-sm items-center gap-2 rounded-xl bg-surface px-4 py-2.5 sm:flex"
+          >
+            <Search className="size-[18px] shrink-0 text-muted" aria-hidden />
+            <input
+              name="busca"
+              type="search"
+              placeholder="Buscar lançamentos"
+              aria-label="Buscar lançamentos"
+              className="w-full bg-transparent text-sm outline-none placeholder:text-muted"
+            />
           </form>
-        </div>
-        <Link
-          href="/lancamentos/novo"
-          className={`${primaryButtonClass} hidden md:inline-flex`}
-        >
-          Novo lançamento
-        </Link>
-        <Suspense fallback={<div className="h-9" />}>
-          <Nav />
-        </Suspense>
-        <form action={signOut} className="mt-auto hidden md:block">
-          <button type="submit" className={textButtonClass}>
-            Sair
-          </button>
-        </form>
-      </aside>
+          <Suspense fallback={<div className="ml-auto h-11" />}>
+            <TopBarActions />
+          </Suspense>
+        </header>
 
-      <main className="min-w-0 flex-1 p-4 pb-24 md:p-8">
-        <div className="mx-auto max-w-4xl">{children}</div>
-      </main>
+        <main className="px-4 pb-24 md:px-8 md:pb-10">
+          <Suspense fallback={null}>
+            <MobileNav />
+          </Suspense>
+          <div className="mx-auto max-w-[1400px]">{children}</div>
+        </main>
+      </div>
 
       <Link
         href="/lancamentos/novo"
-        className={`${primaryButtonClass} fixed inset-x-4 bottom-4 py-3 shadow-lg md:hidden`}
+        className="fixed inset-x-4 bottom-4 flex items-center justify-center gap-2 rounded-xl bg-ink py-3 text-sm font-medium text-white shadow-lg md:hidden"
       >
+        <Plus className="size-4" aria-hidden />
+        Novo lançamento
+      </Link>
+    </div>
+  );
+}
+
+async function SidebarWithData() {
+  const { reviewCount } = await loadShellData();
+  return (
+    <Sidebar reviewCount={reviewCount} signOutAction={signOut}>
+      {reviewCount > 0 && (
+        <div className="mb-2 rounded-2xl border border-line p-4">
+          <span className="mb-3 flex size-9 items-center justify-center rounded-full bg-ink text-white">
+            <Landmark className="size-4" aria-hidden />
+          </span>
+          <p className="text-lg font-semibold leading-tight">
+            {reviewCount} {reviewCount === 1 ? "transação" : "transações"} do banco
+          </p>
+          <p className="mt-1 text-sm text-ink/80">
+            Revise para manter seus números certos.
+          </p>
+          <Link
+            href="/open-finance/revisar"
+            className="mt-4 flex justify-center rounded-xl bg-ink py-2.5 text-sm font-medium text-white"
+          >
+            Revisar agora
+          </Link>
+        </div>
+      )}
+    </Sidebar>
+  );
+}
+
+async function TopBarActions() {
+  const { email, reviewCount } = await loadShellData();
+  const initial = (email[0] ?? "?").toUpperCase();
+  const iconButton =
+    "relative flex size-11 shrink-0 items-center justify-center rounded-xl bg-surface hover:bg-soft";
+
+  return (
+    <div className="ml-auto flex items-center gap-2">
+      <Link
+        href="/open-finance/revisar"
+        className={iconButton}
+        aria-label={
+          reviewCount > 0
+            ? `${reviewCount} transações do banco para revisar`
+            : "Transações do banco"
+        }
+      >
+        <Bell className="size-5" strokeWidth={1.6} aria-hidden />
+        {reviewCount > 0 && (
+          <span className="absolute top-2.5 right-2.5 size-2 rounded-full bg-expense" aria-hidden />
+        )}
+      </Link>
+      <Link href="/categorias" className={iconButton} aria-label="Configurações">
+        <Settings className="size-5" strokeWidth={1.6} aria-hidden />
+      </Link>
+      <div className="hidden items-center gap-2.5 rounded-xl bg-surface py-1.5 pr-4 pl-1.5 lg:flex">
+        <span className="flex size-8 items-center justify-center rounded-full bg-brand text-sm font-semibold">
+          {initial}
+        </span>
+        <span className="max-w-48 truncate text-sm">{email}</span>
+      </div>
+      <Link
+        href="/lancamentos/novo"
+        className="hidden items-center gap-2 rounded-xl bg-surface px-4 py-3 text-sm font-medium hover:bg-soft md:flex"
+      >
+        <Plus className="size-4" aria-hidden />
         Novo lançamento
       </Link>
     </div>

@@ -45,6 +45,35 @@ export function budgetLevel(spentCents: number, limitCents: number): BudgetLevel
   return spentCents >= limitCents * 0.8 ? "warning" : "ok";
 }
 
+export interface DailyPoint {
+  date: string;
+  incomeCents: number;
+  expenseCents: number;
+}
+
+/** Receitas e despesas por dia, incluindo os dias sem movimento. */
+export function dailySeries(
+  rows: { type: string; amount_cents: number; date: string }[],
+  days: string[],
+): DailyPoint[] {
+  const points = new Map(
+    days.map((date) => [date, { date, incomeCents: 0, expenseCents: 0 }]),
+  );
+  for (const row of rows) {
+    const point = points.get(row.date);
+    if (!point) continue;
+    if (row.type === "income") point.incomeCents += row.amount_cents;
+    if (row.type === "expense") point.expenseCents += row.amount_cents;
+  }
+  return days.map((date) => points.get(date) as DailyPoint);
+}
+
+/** Variação em % sobre o mês anterior. Sem base de comparação, devolve null. */
+export function percentChange(current: number, previous: number): number | null {
+  if (previous <= 0) return null;
+  return ((current - previous) / previous) * 100;
+}
+
 export interface MonthEndProjection {
   balanceCents: number;
   pendingIncomeCents: number;

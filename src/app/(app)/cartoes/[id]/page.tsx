@@ -2,7 +2,12 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Card, EmptyState, PageHeader } from "@/components/ui";
 import { invoiceStatus } from "@/lib/cards";
-import { formatDate, formatMonth, todayInBrazil } from "@/lib/dates";
+import {
+  capitalizeFirst,
+  formatDate,
+  formatMonth,
+  todayInBrazil,
+} from "@/lib/dates";
 import { formatCents } from "@/lib/money";
 import { requireDb } from "@/lib/supabase/server";
 import { InvoiceBadge } from "../invoice-badge";
@@ -59,8 +64,8 @@ export default async function CardInvoicesPage({
                   className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 py-3 hover:opacity-70"
                 >
                   <div className="min-w-0 flex-1 basis-48">
-                    <p className="text-sm font-medium capitalize">
-                      {formatMonth(invoice.reference_month.slice(0, 7))}
+                    <p className="text-sm font-medium">
+                      {capitalizeFirst(formatMonth(invoice.reference_month.slice(0, 7)))}
                     </p>
                     <p className="text-xs text-muted">
                       Fecha {formatDate(invoice.closing_date)} · Vence{" "}

@@ -1,13 +1,13 @@
 import Link from "next/link";
 
 export const inputClass =
-  "w-full rounded-lg border border-line bg-surface px-3 py-2 text-sm outline-none focus:border-ink";
+  "w-full rounded-xl border border-line bg-surface px-3 py-2.5 text-sm outline-none focus:border-ink";
 
 export const primaryButtonClass =
-  "inline-flex items-center justify-center rounded-lg bg-ink px-4 py-2 text-sm font-medium text-white hover:bg-black disabled:opacity-60";
+  "inline-flex items-center justify-center rounded-xl bg-ink px-4 py-2.5 text-sm font-medium text-white hover:bg-black disabled:opacity-60";
 
 export const secondaryButtonClass =
-  "inline-flex items-center justify-center rounded-lg border border-line bg-surface px-3 py-2 text-sm font-medium hover:border-ink disabled:opacity-60";
+  "inline-flex items-center justify-center rounded-xl border border-line bg-surface px-3 py-2.5 text-sm font-medium hover:bg-soft disabled:opacity-60";
 
 export const textButtonClass =
   "text-sm font-medium text-muted underline-offset-2 hover:text-ink hover:underline";
@@ -20,7 +20,7 @@ export function Card({
   className?: string;
 }) {
   return (
-    <section className={`rounded-2xl bg-surface p-5 ${className}`}>
+    <section className={`@container rounded-[20px] bg-surface p-5 md:p-6 ${className}`}>
       {children}
     </section>
   );

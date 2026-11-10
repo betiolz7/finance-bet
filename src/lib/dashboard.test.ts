@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
   budgetLevel,
+  dailySeries,
   effectiveBudgets,
+  percentChange,
   spendingByCategory,
   upcomingBills,
 } from "./dashboard";
@@ -81,6 +83,34 @@ describe("upcomingBills", () => {
 
   it("marca o que já venceu", () => {
     expect(bills.map((bill) => bill.overdue)).toEqual([true, false]);
+  });
+});
+
+describe("dailySeries", () => {
+  it("soma por dia, mantém dias vazios e ignora transferências", () => {
+    expect(
+      dailySeries(
+        [
+          { type: "income", amount_cents: 100, date: "2026-11-09" },
+          { type: "expense", amount_cents: 30, date: "2026-11-09" },
+          { type: "expense", amount_cents: 20, date: "2026-11-09" },
+          { type: "transfer", amount_cents: 999, date: "2026-11-09" },
+          { type: "expense", amount_cents: 999, date: "2026-11-01" },
+        ],
+        ["2026-11-09", "2026-11-10"],
+      ),
+    ).toEqual([
+      { date: "2026-11-09", incomeCents: 100, expenseCents: 50 },
+      { date: "2026-11-10", incomeCents: 0, expenseCents: 0 },
+    ]);
+  });
+});
+
+describe("percentChange", () => {
+  it("calcula a variação e evita divisão por zero", () => {
+    expect(percentChange(115, 100)).toBeCloseTo(15);
+    expect(percentChange(50, 100)).toBe(-50);
+    expect(percentChange(50, 0)).toBeNull();
   });
 });
 

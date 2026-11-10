@@ -47,16 +47,17 @@ const AMOUNT_STYLE: Record<ListedType, { sign: string; className: string }> = {
 export default async function TransactionsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ mes?: string }>;
+  searchParams: Promise<{ mes?: string; busca?: string }>;
 }) {
-  const { mes } = await searchParams;
+  const { mes, busca } = await searchParams;
+  const search = busca?.trim().slice(0, 100) ?? "";
   const db = await requireDb();
   await ensureRecurringGenerated();
 
   const month = mes && isValidMonth(mes) ? mes : todayInBrazil().slice(0, 7);
   const { start, end } = monthBounds(month);
 
-  const { data, error } = await db
+  let query = db
     .from("transactions")
     .select(
       `id, type, status, amount_cents, date, description, recurring_rule_id,
@@ -66,10 +67,15 @@ export default async function TransactionsPage({
        account:accounts!transactions_account_id_fkey(name),
        to_account:accounts!transactions_to_account_id_fkey(name)`,
     )
-    .gte("date", start)
-    .lt("date", end)
     .order("date", { ascending: false })
     .order("created_at", { ascending: false });
+  // A busca procura em todos os meses. Sem busca, mostra só o mês escolhido.
+  query = search
+    ? query
+        .ilike("description", `%${search.replace(/[\\%_]/g, "\\$&")}%`)
+        .limit(200)
+    : query.gte("date", start).lt("date", end);
+  const { data, error } = await query;
   if (error) throw new Error(error.message);
 
   const rows = data as unknown as ListedTransaction[];
@@ -78,8 +84,16 @@ export default async function TransactionsPage({
   return (
     <>
       <PageHeader
-        title="Lançamentos"
-        action={<MonthNav basePath="/lancamentos" month={month} />}
+        title={search ? `Busca: "${search}"` : "Lançamentos"}
+        action={
+          search ? (
+            <Link href="/lancamentos" className={textButtonClass}>
+              Limpar busca
+            </Link>
+          ) : (
+            <MonthNav basePath="/lancamentos" month={month} />
+          )
+        }
       />
 
       <div className="mb-4 grid gap-3 sm:grid-cols-3">
@@ -91,7 +105,7 @@ export default async function TransactionsPage({
       <Card>
         {rows.length === 0 ? (
           <EmptyState
-            message="Nenhum lançamento neste mês."
+            message={search ? "Nada encontrado." : "Nenhum lançamento neste mês."}
             href="/lancamentos/novo"
             linkLabel="Criar lançamento"
           />

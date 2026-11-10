@@ -7,6 +7,18 @@ export function formatCents(cents: number): string {
   return BRL.format(cents / 100);
 }
 
+const BRL_COMPACT = new Intl.NumberFormat("pt-BR", {
+  style: "currency",
+  currency: "BRL",
+  notation: "compact",
+  maximumFractionDigits: 1,
+});
+
+/** Formato curto para eixos de gráfico: "R$ 1,2 mil". */
+export function formatCompactCents(cents: number): string {
+  return BRL_COMPACT.format(cents / 100);
+}
+
 /** Valor de centavos no formato usado nos campos de texto: "1234,56". */
 export function centsToInput(cents: number): string {
   const sign = cents < 0 ? "-" : "";

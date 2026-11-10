@@ -59,6 +59,11 @@ export function formatDate(iso: string): string {
   return `${day}/${month}/${year}`;
 }
 
+/** "novembro de 2026" vira "Novembro de 2026", sem mexer no "de". */
+export function capitalizeFirst(text: string): string {
+  return text.charAt(0).toUpperCase() + text.slice(1);
+}
+
 export function formatMonth(month: string): string {
   const [year, monthNumber] = month.split("-").map(Number);
   return `${MONTH_NAMES[monthNumber - 1]} de ${year}`;
