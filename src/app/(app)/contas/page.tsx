@@ -1,62 +1,113 @@
 import Link from "next/link";
-import { ActionForm, SubmitButton } from "@/components/forms";
-import { Card, EmptyState, PageHeader, textButtonClass } from "@/components/ui";
+import { BankIcon, type Institution } from "@/components/bank-icon";
+import {
+  Card,
+  EmptyState,
+  PageHeader,
+  secondaryButtonClass,
+  textButtonClass,
+} from "@/components/ui";
 import { formatCents } from "@/lib/money";
 import { requireDb } from "@/lib/supabase/server";
-import { AccountFields, ACCOUNT_KINDS } from "./account-fields";
-import { createAccount, setAccountArchived } from "./actions";
+import { ACCOUNT_KINDS } from "./account-fields";
+import { setAccountArchived } from "./actions";
 
-interface AccountBalance {
+interface AccountRow extends Institution {
   id: string;
   name: string;
   kind: string;
   archived: boolean;
   balance_cents: number;
+  connected: boolean;
 }
 
 export default async function AccountsPage() {
   const db = await requireDb();
-  const { data, error } = await db
-    .from("account_balances")
-    .select("id, name, kind, archived, balance_cents")
-    .order("name");
-  if (error) throw new Error(error.message);
+  const [balances, details, links] = await Promise.all([
+    db
+      .from("account_balances")
+      .select("id, name, kind, archived, balance_cents")
+      .order("name"),
+    db
+      .from("accounts")
+      .select("id, institution_name, institution_logo, institution_color"),
+    db.from("bank_links").select("account_id").not("account_id", "is", null),
+  ]);
+  if (balances.error) throw new Error(balances.error.message);
+  if (details.error) throw new Error(details.error.message);
+  if (links.error) throw new Error(links.error.message);
 
-  const rows = data as AccountBalance[];
-  const active = rows.filter((row) => !row.archived);
+  const detailById = new Map(
+    (details.data as (Institution & { id: string })[]).map((row) => [row.id, row]),
+  );
+  const connectedIds = new Set(
+    (links.data as { account_id: string }[]).map((row) => row.account_id),
+  );
+  const rows: AccountRow[] = (
+    balances.data as Omit<AccountRow, "connected">[]
+  ).map((row) => ({
+    ...row,
+    ...detailById.get(row.id),
+    connected: connectedIds.has(row.id),
+  }));
+
+  const connected = rows.filter((row) => row.connected && !row.archived);
+  const manual = rows.filter((row) => !row.connected && !row.archived);
   const archived = rows.filter((row) => row.archived);
-  const total = active.reduce((sum, row) => sum + row.balance_cents, 0);
+  const total = [...connected, ...manual].reduce(
+    (sum, row) => sum + row.balance_cents,
+    0,
+  );
 
   return (
     <>
-      <PageHeader title="Contas" />
+      <PageHeader
+        title="Contas"
+        action={
+          <Link href="/open-finance" className={secondaryButtonClass}>
+            Conectar banco
+          </Link>
+        }
+      />
 
       <Card className="mb-4">
         <p className="text-sm text-muted">Saldo total</p>
-        <p className="mt-1 text-3xl font-semibold tracking-tight tabular-nums">
+        <p className="mt-1 whitespace-nowrap text-3xl font-semibold tracking-tight tabular-nums">
           {formatCents(total)}
         </p>
       </Card>
 
       <Card className="mb-4">
-        {active.length === 0 ? (
-          <EmptyState message="Nenhuma conta cadastrada ainda." />
+        <h2 className="mb-1 font-semibold">Conectadas pelo Open Finance</h2>
+        {connected.length === 0 ? (
+          <EmptyState
+            message="Nenhuma conta conectada ainda."
+            href="/open-finance"
+            linkLabel="Conectar banco"
+          />
         ) : (
           <ul className="divide-y divide-line">
-            {active.map((row) => (
+            {connected.map((row) => (
               <AccountItem key={row.id} row={row} />
             ))}
           </ul>
         )}
       </Card>
 
-      <Card className="mb-4">
-        <h2 className="mb-3 font-semibold">Nova conta</h2>
-        <ActionForm action={createAccount} className="grid items-end gap-4 sm:grid-cols-4">
-          <AccountFields />
-          <SubmitButton>Adicionar</SubmitButton>
-        </ActionForm>
-      </Card>
+      {manual.length > 0 && (
+        <Card className="mb-4">
+          <h2 className="mb-1 font-semibold">Criadas antes da conexão</h2>
+          <p className="mb-1 text-sm text-muted">
+            Contas criadas à mão, sem ligação com o banco. Arquive as que não usa
+            mais. O histórico de lançamentos é mantido.
+          </p>
+          <ul className="divide-y divide-line">
+            {manual.map((row) => (
+              <AccountItem key={row.id} row={row} />
+            ))}
+          </ul>
+        </Card>
+      )}
 
       {archived.length > 0 && (
         <Card>
@@ -72,14 +123,19 @@ export default async function AccountsPage() {
   );
 }
 
-function AccountItem({ row }: { row: AccountBalance }) {
+function AccountItem({ row }: { row: AccountRow }) {
   return (
-    <li className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 py-3">
-      <div className="min-w-0 flex-1 basis-40">
-        <p className="truncate text-sm font-medium">{row.name}</p>
-        <p className="text-xs text-muted">{ACCOUNT_KINDS[row.kind]}</p>
+    <li className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 py-3">
+      <div className="flex min-w-0 flex-1 basis-48 items-center gap-3">
+        <BankIcon institution={row} fallbackName={row.name} />
+        <div className="min-w-0">
+          <p className="truncate text-sm font-medium">{row.name}</p>
+          <p className="text-xs text-muted">
+            {row.institution_name ?? ACCOUNT_KINDS[row.kind]}
+          </p>
+        </div>
       </div>
-      <p className="text-sm font-semibold tabular-nums">
+      <p className="whitespace-nowrap text-sm font-semibold tabular-nums">
         {formatCents(row.balance_cents)}
       </p>
       <div className="flex items-center gap-3">

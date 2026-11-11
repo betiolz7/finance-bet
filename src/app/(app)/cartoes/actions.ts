@@ -25,21 +25,6 @@ function parseCardForm(formData: FormData) {
   });
 }
 
-export async function createCard(
-  _state: ActionState,
-  formData: FormData,
-): Promise<ActionState> {
-  const db = await requireDb();
-  const parsed = parseCardForm(formData);
-  if (!parsed.ok) return { error: parsed.error };
-
-  const { error } = await db.from("credit_cards").insert(parsed.data);
-  if (error) return { error: describeDbError(error) };
-
-  revalidatePath("/", "layout");
-  return {};
-}
-
 export async function updateCard(
   id: string,
   _state: ActionState,

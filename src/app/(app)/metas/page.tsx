@@ -95,9 +95,9 @@ export default async function GoalsPage() {
         </p>
         {options.accounts.length === 0 ? (
           <EmptyState
-            message="Cadastre uma conta antes de criar uma meta."
-            href="/contas"
-            linkLabel="Cadastrar conta"
+            message="Conecte seu banco antes de criar uma meta."
+            href="/open-finance"
+            linkLabel="Conectar banco"
           />
         ) : (
           <ActionForm

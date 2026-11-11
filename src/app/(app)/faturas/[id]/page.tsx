@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { CreditCardVisual } from "@/components/credit-card-visual";
 import { ActionForm, ConfirmButton, SubmitButton } from "@/components/forms";
 import {
   Card,
@@ -31,7 +32,13 @@ interface InvoiceDetail {
   closing_date: string;
   due_date: string;
   paid_at: string | null;
-  card: { name: string; payment_account_id: string };
+  card: {
+    name: string;
+    payment_account_id: string;
+    color: string | null;
+    style: string | null;
+    last_digits: string | null;
+  };
 }
 
 interface Item {
@@ -58,7 +65,7 @@ export default async function InvoicePage({
     db
       .from("invoices")
       .select(
-        "id, card_id, reference_month, closing_date, due_date, paid_at, card:credit_cards(name, payment_account_id)",
+        "id, card_id, reference_month, closing_date, due_date, paid_at, card:credit_cards(name, payment_account_id, color, style, last_digits)",
       )
       .eq("id", id)
       .maybeSingle(),
@@ -97,19 +104,34 @@ export default async function InvoicePage({
       />
 
       <Card className="mb-4">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <p className="text-sm text-muted">Total da fatura</p>
-            <p className="mt-1 text-3xl font-semibold tracking-tight tabular-nums">
+        <div className="flex flex-wrap items-center gap-6">
+          <Link
+            href={`/cartoes/${invoice.card_id}`}
+            className="w-36 shrink-0 sm:w-40"
+            aria-label={`Ver todas as faturas de ${invoice.card.name}`}
+          >
+            <CreditCardVisual card={invoice.card} className="transition hover:-translate-y-1" />
+          </Link>
+          <div className="min-w-0 flex-1 basis-56">
+            <InvoiceBadge status={invoiceStatus(invoice, today)} />
+            <p className="mt-3 text-sm text-muted">Total da fatura</p>
+            <p className="whitespace-nowrap text-3xl font-semibold tracking-tight tabular-nums">
               {formatCents(total)}
             </p>
-          </div>
-          <div className="text-right">
-            <InvoiceBadge status={invoiceStatus(invoice, today)} />
-            <p className="mt-1 text-xs text-muted">
-              Fecha {formatDate(invoice.closing_date)} · Vence{" "}
-              {formatDate(invoice.due_date)}
-            </p>
+            <dl className="mt-3 grid grid-cols-2 gap-3 text-sm sm:max-w-sm">
+              <div>
+                <dt className="text-xs text-muted">Fecha em</dt>
+                <dd className="font-medium tabular-nums">{formatDate(invoice.closing_date)}</dd>
+              </div>
+              <div>
+                <dt className="text-xs text-muted">Vence em</dt>
+                <dd className="font-medium tabular-nums">{formatDate(invoice.due_date)}</dd>
+              </div>
+              <div>
+                <dt className="text-xs text-muted">Compras</dt>
+                <dd className="font-medium tabular-nums">{purchases.length}</dd>
+              </div>
+            </dl>
           </div>
         </div>
       </Card>

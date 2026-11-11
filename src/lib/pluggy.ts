@@ -34,6 +34,41 @@ export interface PluggyAccount {
   number?: string | null;
   balance?: number | null;
   itemId: string;
+  creditData?: {
+    balanceCloseDate?: string | null;
+    balanceDueDate?: string | null;
+    creditLimit?: number | null;
+  } | null;
+}
+
+export interface PluggyConnector {
+  id: number;
+  name: string;
+  imageUrl?: string | null;
+  primaryColor?: string | null;
+  isSandbox?: boolean;
+}
+
+/** Id do conector MeuPluggy, que não identifica o banco de origem. */
+export const MEU_PLUGGY_CONNECTOR_ID = 200;
+
+export async function listBankConnectors(): Promise<PluggyConnector[]> {
+  const params = new URLSearchParams({ countries: "BR", types: "PERSONAL_BANK" });
+  const { results } = await get<{ results: PluggyConnector[] }>(`/connectors?${params}`);
+  const seen = new Set<string>();
+  return results
+    .filter((c) => !c.isSandbox && c.id !== MEU_PLUGGY_CONNECTOR_ID)
+    .sort((a, b) => a.name.localeCompare(b.name, "pt-BR"))
+    .filter((c) => {
+      const key = c.name.toLowerCase();
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+}
+
+export function getConnector(id: number): Promise<PluggyConnector> {
+  return get<PluggyConnector>(`/connectors/${id}`);
 }
 
 export interface PluggyTransaction {
@@ -45,6 +80,7 @@ export interface PluggyTransaction {
   type: "DEBIT" | "CREDIT" | string;
   status?: string | null;
   category?: string | null;
+  createdAt?: string | null;
   creditCardMetadata?: {
     installmentNumber?: number | null;
     totalInstallments?: number | null;
@@ -147,11 +183,50 @@ export async function listInvestments(itemId: string): Promise<PluggyInvestment[
   }
 }
 
+export async function getAccount(id: string): Promise<PluggyAccount> {
+  return get<PluggyAccount>(`/accounts/${encodeURIComponent(id)}`);
+}
+
+async function post<T>(path: string, body: unknown): Promise<T> {
+  const response = await fetch(new URL(path, BASE_URL), {
+    method: "POST",
+    headers: { "X-API-KEY": await apiKey(), "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+    cache: "no-store",
+  });
+  if (!response.ok) {
+    throw new PluggyError("A Pluggy não respondeu como esperado.", response.status);
+  }
+  return (await response.json()) as T;
+}
+
+export interface PluggyWebhook {
+  id: string;
+  url: string;
+  event: string;
+}
+
+export async function listWebhooks(): Promise<PluggyWebhook[]> {
+  const body = await get<{ results?: PluggyWebhook[] } | PluggyWebhook[]>("/webhooks");
+  return Array.isArray(body) ? body : (body.results ?? []);
+}
+
+export function createWebhook(webhook: {
+  url: string;
+  event: string;
+  headers: Record<string, string>;
+}): Promise<PluggyWebhook> {
+  return post<PluggyWebhook>("/webhooks", webhook);
+}
+
+/** Com createdAtFrom, traz só o que a Pluggy recebeu a partir desse momento. */
 export async function listTransactions(
   accountId: string,
   dateFrom: string,
+  createdAtFrom?: string,
 ): Promise<PluggyTransaction[]> {
   const params = new URLSearchParams({ accountId, dateFrom });
+  if (createdAtFrom) params.set("createdAtFrom", createdAtFrom);
   const all: PluggyTransaction[] = [];
   let query: string | null = `?${params}`;
 

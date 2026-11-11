@@ -16,9 +16,9 @@ export default async function NewTransactionPage() {
       <Card>
         {accounts.length === 0 ? (
           <EmptyState
-            message="Cadastre uma conta antes de lançar."
-            href="/contas"
-            linkLabel="Cadastrar conta"
+            message="Conecte seu banco antes de lançar."
+            href="/open-finance"
+            linkLabel="Conectar banco"
           />
         ) : categories.length === 0 ? (
           <EmptyState

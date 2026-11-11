@@ -61,9 +61,9 @@ export default async function ImportPage() {
       ) : (
         <Card className="mb-4">
           <EmptyState
-            message="Cadastre uma conta e uma categoria de despesa antes de importar."
-            href={accounts.length === 0 ? "/contas" : "/categorias"}
-            linkLabel="Cadastrar"
+            message="Conecte seu banco e cadastre uma categoria de despesa antes de importar."
+            href={accounts.length === 0 ? "/open-finance" : "/categorias"}
+            linkLabel={accounts.length === 0 ? "Conectar banco" : "Cadastrar categoria"}
           />
         </Card>
       )}

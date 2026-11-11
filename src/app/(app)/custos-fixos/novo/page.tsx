@@ -18,9 +18,9 @@ export default async function NewFixedCostPage() {
       <Card>
         {accounts.length === 0 ? (
           <EmptyState
-            message="Cadastre uma conta antes de criar um custo fixo."
-            href="/contas"
-            linkLabel="Cadastrar conta"
+            message="Conecte seu banco antes de criar um custo fixo."
+            href="/open-finance"
+            linkLabel="Conectar banco"
           />
         ) : !hasExpenseCategory ? (
           <EmptyState

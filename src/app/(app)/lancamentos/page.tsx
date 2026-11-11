@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { BankIcon, type Institution } from "@/components/bank-icon";
 import { ConfirmButton } from "@/components/forms";
 import { MonthNav } from "@/components/month-nav";
 import { Card, EmptyState, PageHeader, textButtonClass } from "@/components/ui";
@@ -32,9 +33,9 @@ interface ListedTransaction {
   installment_number: number | null;
   installment_total: number | null;
   category: { name: string; color: string } | null;
-  account: { name: string } | null;
+  account: ({ name: string } & Institution) | null;
   to_account: { name: string } | null;
-  invoice: { card: { name: string } } | null;
+  invoice: { card: { name: string } & Institution } | null;
 }
 
 const AMOUNT_STYLE: Record<ListedType, { sign: string; className: string }> = {
@@ -62,9 +63,9 @@ export default async function TransactionsPage({
     .select(
       `id, type, status, amount_cents, date, description, recurring_rule_id,
        invoice_id, installment_number, installment_total,
-       invoice:invoices(card:credit_cards(name)),
+       invoice:invoices(card:credit_cards(name, institution_name, institution_logo, institution_color)),
        category:categories(name, color),
-       account:accounts!transactions_account_id_fkey(name),
+       account:accounts!transactions_account_id_fkey(name, institution_name, institution_logo, institution_color),
        to_account:accounts!transactions_to_account_id_fkey(name)`,
     )
     .order("date", { ascending: false })
@@ -142,7 +143,11 @@ function TransactionItem({ row }: { row: ListedTransaction }) {
 
   return (
     <li className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 py-3">
-      <div className="min-w-0 flex-1 basis-56">
+      <BankIcon
+        institution={row.account ?? row.invoice?.card}
+        fallbackName={row.account?.name ?? row.invoice?.card.name ?? "?"}
+      />
+      <div className="min-w-0 flex-1 basis-48">
         <p className="truncate text-sm font-medium">
           {row.description}
           {installment}

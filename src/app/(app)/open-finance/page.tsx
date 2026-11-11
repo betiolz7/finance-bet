@@ -1,28 +1,29 @@
 import Link from "next/link";
+import { BankIcon, type Institution } from "@/components/bank-icon";
 import { ActionForm, SubmitButton } from "@/components/forms";
 import {
   Card,
   EmptyState,
-  Field,
   PageHeader,
   inputClass,
   secondaryButtonClass,
   textButtonClass,
 } from "@/components/ui";
+import { connectedItemIds } from "@/lib/connected-accounts-server";
 import { addDays, formatDate, todayInBrazil } from "@/lib/dates";
 import {
   getItem,
   isPluggyConfigured,
   listAccounts,
-  pluggyItemIds,
+  listBankConnectors,
   type PluggyAccount,
+  type PluggyConnector,
   type PluggyItem,
 } from "@/lib/pluggy";
 import { requireDb } from "@/lib/supabase/server";
-import { loadActiveCards, loadFormOptions } from "../lancamentos/queries";
-import type { Option } from "../lancamentos/transaction-form";
-import { saveBankLink, syncBank } from "./actions";
+import { refreshConnectedAccounts, setItemBank, syncBank } from "./actions";
 import { ConnectBank } from "./connect-bank";
+import { NotificationsCard } from "./notifications-card";
 
 const CONSENT_WARNING_DAYS = 30;
 
@@ -34,20 +35,34 @@ const ITEM_STATUS: Record<string, string> = {
   WAITING_USER_INPUT: "Aguardando ação sua",
 };
 
-interface BankLink {
+interface StoredItem extends Institution {
+  item_id: string;
+  connector_id: number | null;
+}
+
+interface LinkRow {
   pluggy_account_id: string;
-  account_id: string | null;
-  card_id: string | null;
-  import_from: string;
+  account: { name: string } | null;
+  card: { name: string } | null;
 }
 
 async function loadConnections(itemIds: string[]) {
   try {
-    const items = await Promise.all(itemIds.map(getItem));
-    const accounts = (await Promise.all(itemIds.map(listAccounts))).flat();
-    return { items, accounts, failed: false };
+    const [items, accounts] = await Promise.all([
+      Promise.all(itemIds.map(getItem)),
+      Promise.all(itemIds.map(listAccounts)),
+    ]);
+    return { items, accounts: accounts.flat(), failed: false };
   } catch {
     return { items: [] as PluggyItem[], accounts: [] as PluggyAccount[], failed: true };
+  }
+}
+
+async function loadConnectors(): Promise<PluggyConnector[]> {
+  try {
+    return await listBankConnectors();
+  } catch {
+    return [];
   }
 }
 
@@ -73,32 +88,32 @@ export default async function OpenFinancePage() {
     );
   }
 
-  const storedItems = await db.from("bank_items").select("item_id");
-  if (storedItems.error) throw new Error(storedItems.error.message);
-  const itemIds = [
-    ...new Set([
-      ...pluggyItemIds(),
-      ...(storedItems.data as { item_id: string }[]).map((row) => row.item_id),
-    ]),
-  ];
-
-  const [connections, links, pending, options, cards] = await Promise.all([
+  const itemIds = await connectedItemIds(db);
+  const [connections, connectors, stored, links, pending] = await Promise.all([
     loadConnections(itemIds),
-    db.from("bank_links").select("pluggy_account_id, account_id, card_id, import_from"),
+    loadConnectors(),
+    db
+      .from("bank_items")
+      .select("item_id, connector_id, institution_name, institution_logo, institution_color"),
+    db
+      .from("bank_links")
+      .select("pluggy_account_id, account:accounts(name), card:credit_cards(name)"),
     db
       .from("bank_transactions")
       .select("id", { count: "exact", head: true })
       .eq("state", "new"),
-    loadFormOptions(),
-    loadActiveCards(),
   ]);
+  if (stored.error) throw new Error(stored.error.message);
   if (links.error) throw new Error(links.error.message);
 
-  const linkByAccount = new Map(
-    (links.data as BankLink[]).map((link) => [link.pluggy_account_id, link]),
+  const storedById = new Map(
+    (stored.data as StoredItem[]).map((item) => [item.item_id, item]),
   );
+  const linkByAccount = new Map(
+    (links.data as unknown as LinkRow[]).map((link) => [link.pluggy_account_id, link]),
+  );
+  const missing = connections.accounts.filter((a) => !linkByAccount.has(a.id));
   const pendingCount = pending.count ?? 0;
-  const firstOfMonth = `${today.slice(0, 7)}-01`;
 
   return (
     <>
@@ -116,8 +131,8 @@ export default async function OpenFinancePage() {
       {connections.failed && (
         <Card className="mb-4">
           <p role="alert" className="text-sm text-expense">
-            Não foi possível falar com a Pluggy. Confira as credenciais e os IDs no
-            arquivo .env.local.
+            Não foi possível falar com a Pluggy. Confira as credenciais no arquivo
+            .env.local.
           </p>
         </Card>
       )}
@@ -125,137 +140,146 @@ export default async function OpenFinancePage() {
       <Card className="mb-4">
         <h2 className="mb-1 font-semibold">Conectar banco</h2>
         <p className="mb-3 text-sm text-muted">
-          Abre a janela segura da Pluggy. Suas senhas não passam pelo app.
+          Contas e cartões entram no app só por aqui. Suas senhas não passam pelo
+          app.
         </p>
         <ConnectBank />
       </Card>
 
-      {connections.items.length > 0 && (
-        <Card className="mb-4">
-          <h2 className="mb-1 font-semibold">Conexões</h2>
-          <ul className="divide-y divide-line">
-            {connections.items.map((item) => {
-              const expiring =
-                item.consentExpiresAt &&
-                todayInBrazil(new Date(item.consentExpiresAt)) <=
-                  addDays(today, CONSENT_WARNING_DAYS);
-              return (
-                <li key={item.id} className="py-3 text-sm">
-                  <p className="font-medium">
-                    {item.connector?.name ?? "Banco"}:{" "}
-                    {ITEM_STATUS[item.status] ?? item.status}
+      {connections.items.map((item) => {
+        const info = storedById.get(item.id);
+        const accounts = connections.accounts.filter((a) => a.itemId === item.id);
+        const expiring =
+          item.consentExpiresAt &&
+          todayInBrazil(new Date(item.consentExpiresAt)) <=
+            addDays(today, CONSENT_WARNING_DAYS);
+
+        return (
+          <Card key={item.id} className="mb-4">
+            <div className="flex flex-wrap items-start gap-4">
+              <BankIcon institution={info} fallbackName="Banco" size={48} />
+              <div className="min-w-0 flex-1 basis-56">
+                <p className="font-semibold">
+                  {info?.institution_name ?? "Banco não identificado"}
+                </p>
+                <p className="text-xs text-muted">
+                  {ITEM_STATUS[item.status] ?? item.status}
+                  {item.lastUpdatedAt &&
+                    ` · Dados de ${brazilDate(item.lastUpdatedAt)}`}
+                  {" · Atualiza uma vez por dia"}
+                </p>
+                {item.consentExpiresAt && (
+                  <p
+                    className={`text-xs ${expiring ? "font-medium text-expense" : "text-muted"}`}
+                  >
+                    {expiring && "▲ "}Autorização válida até{" "}
+                    {brazilDate(item.consentExpiresAt)}
                   </p>
-                  <p className="text-xs text-muted">
-                    {item.lastUpdatedAt &&
-                      `Dados atualizados em ${brazilDate(item.lastUpdatedAt)}. `}
-                    O MeuPluggy atualiza uma vez por dia.
-                  </p>
-                  {item.consentExpiresAt && (
-                    <p
-                      className={`text-xs ${expiring ? "font-medium text-expense" : "text-muted"}`}
+                )}
+              </div>
+            </div>
+
+            {connectors.length > 0 && (
+              <ActionForm
+                action={setItemBank.bind(null, item.id)}
+                className="mt-4 flex flex-wrap items-end gap-2"
+              >
+                <label className="min-w-0 flex-1 basis-56">
+                  <span className="mb-1 block text-sm font-medium">
+                    Qual banco é esta conexão?
+                  </span>
+                  <select
+                    name="connectorId"
+                    required
+                    defaultValue={info?.connector_id ?? ""}
+                    className={inputClass}
+                  >
+                    <option value="">Selecione o banco</option>
+                    {connectors.map((connector) => (
+                      <option key={connector.id} value={connector.id}>
+                        {connector.name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <SubmitButton>Salvar</SubmitButton>
+              </ActionForm>
+            )}
+
+            <ul className="mt-4 divide-y divide-line border-t border-line">
+              {accounts.map((account) => {
+                const link = linkByAccount.get(account.id);
+                const appName = link?.account?.name ?? link?.card?.name;
+                return (
+                  <li
+                    key={account.id}
+                    className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 py-3"
+                  >
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-medium">
+                        {account.marketingName ?? account.name}
+                      </p>
+                      <p className="text-xs text-muted">
+                        {account.type === "CREDIT" ? "Cartão de crédito" : "Conta"}
+                        {account.number && ` · final ${account.number.slice(-4)}`}
+                      </p>
+                    </div>
+                    <span
+                      className={`text-xs font-medium ${appName ? "text-income" : "text-pending"}`}
                     >
-                      {expiring && "▲ "}Autorização válida até{" "}
-                      {brazilDate(item.consentExpiresAt)}
-                    </p>
-                  )}
-                </li>
-              );
-            })}
-          </ul>
+                      {appName ? `✓ No app como ${appName}` : "● Ainda não importada"}
+                    </span>
+                  </li>
+                );
+              })}
+            </ul>
+          </Card>
+        );
+      })}
+
+      {connections.items.length > 0 && <NotificationsCard />}
+
+      {missing.length > 0 && (
+        <Card className="mb-4">
+          <ActionForm
+            action={refreshConnectedAccounts}
+            className="flex flex-wrap items-center justify-between gap-3"
+          >
+            <p className="text-sm">
+              {missing.length}{" "}
+              {missing.length === 1 ? "conta ainda não foi importada" : "contas ainda não foram importadas"}{" "}
+              para o app.
+            </p>
+            <SubmitButton>Importar contas</SubmitButton>
+          </ActionForm>
         </Card>
       )}
 
-      <Card className="mb-4">
-        <h2 className="mb-1 font-semibold">Contas do banco</h2>
-        <p className="mb-2 text-sm text-muted">
-          Escolha onde cada conta deve cair no app. A data inicial evita trazer de
-          volta o que você já lançou à mão.
-        </p>
-        {connections.accounts.length === 0 ? (
-          <EmptyState message="Nenhuma conta encontrada." />
-        ) : (
-          <ul className="divide-y divide-line">
-            {connections.accounts.map((account) => (
-              <AccountLink
-                key={account.id}
-                account={account}
-                link={linkByAccount.get(account.id)}
-                options={account.type === "CREDIT" ? cards : options.accounts}
-                defaultFrom={firstOfMonth}
-              />
-            ))}
-          </ul>
-        )}
-      </Card>
-
-      <Card>
-        <ActionForm
-          action={syncBank}
-          className="flex flex-wrap items-center justify-between gap-3"
-        >
-          <p className="text-sm text-muted">
-            Nada é lançado sem a sua revisão.
-          </p>
-          <SubmitButton>Buscar transações</SubmitButton>
-        </ActionForm>
-      </Card>
-    </>
-  );
-}
-
-function AccountLink({
-  account,
-  link,
-  options,
-  defaultFrom,
-}: {
-  account: PluggyAccount;
-  link?: BankLink;
-  options: Option[];
-  defaultFrom: string;
-}) {
-  const isCard = account.type === "CREDIT";
-  const current = link?.card_id ?? link?.account_id ?? "";
-
-  return (
-    <li className="py-3">
-      <p className="truncate text-sm font-medium">
-        {account.marketingName ?? account.name}
-      </p>
-      <p className="mb-2 text-xs text-muted">
-        {isCard ? "Cartão de crédito" : "Conta"}
-        {account.number && ` · final ${account.number.slice(-4)}`}
-      </p>
-      {options.length === 0 ? (
-        <Link href={isCard ? "/cartoes" : "/contas"} className={textButtonClass}>
-          {isCard ? "Cadastre um cartão no app" : "Cadastre uma conta no app"}
-        </Link>
+      {connections.items.length === 0 && !connections.failed ? (
+        <Card>
+          <EmptyState message="Nenhum banco conectado ainda." />
+        </Card>
       ) : (
-        <ActionForm
-          action={saveBankLink.bind(null, account.id, account.type)}
-          className="grid items-end gap-3 sm:grid-cols-[1fr_11rem_auto]"
-        >
-          <Field label={isCard ? "Cartão no app" : "Conta no app"}>
-            <select name="destination" defaultValue={current} className={inputClass}>
-              <option value="">Não sincronizar</option>
-              {options.map((option) => (
-                <option key={option.id} value={option.id}>
-                  {option.name}
-                </option>
-              ))}
-            </select>
-          </Field>
-          <Field label="Buscar a partir de">
-            <input
-              name="importFrom"
-              type="date"
-              defaultValue={link?.import_from ?? defaultFrom}
-              className={inputClass}
-            />
-          </Field>
-          <SubmitButton>Salvar</SubmitButton>
-        </ActionForm>
+        <Card>
+          <ActionForm
+            action={syncBank}
+            className="flex flex-wrap items-center justify-between gap-3"
+          >
+            <p className="text-sm text-muted">
+              Contas novas entram com o saldo informado pelo banco. Nada é lançado
+              sem a sua revisão.
+            </p>
+            <SubmitButton>Buscar transações</SubmitButton>
+          </ActionForm>
+        </Card>
       )}
-    </li>
+
+      <p className="mt-4 text-xs text-muted">
+        Os ícones dos bancos são fornecidos pela Pluggy.{" "}
+        <Link href="/contas" className={textButtonClass}>
+          Ver contas no app
+        </Link>
+      </p>
+    </>
   );
 }

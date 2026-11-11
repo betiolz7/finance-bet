@@ -20,21 +20,6 @@ function parseForm(formData: FormData) {
   return { data: { name, kind, initial_balance_cents: cents } };
 }
 
-export async function createAccount(
-  _state: ActionState,
-  formData: FormData,
-): Promise<ActionState> {
-  const db = await requireDb();
-  const parsed = parseForm(formData);
-  if (!parsed.data) return { error: parsed.error };
-
-  const { error } = await db.from("accounts").insert(parsed.data);
-  if (error) return { error: describeDbError(error) };
-
-  revalidatePath("/", "layout");
-  return {};
-}
-
 export async function updateAccount(
   id: string,
   _state: ActionState,

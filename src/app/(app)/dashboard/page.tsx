@@ -9,6 +9,7 @@ import {
   Upload,
 } from "lucide-react";
 import Link from "next/link";
+import { BankIcon, type Institution } from "@/components/bank-icon";
 import { BudgetStatus } from "@/components/budget-status";
 import { CreditCardVisual } from "@/components/credit-card-visual";
 import { MonthNav } from "@/components/month-nav";
@@ -56,8 +57,8 @@ interface MonthTransaction {
   date: string;
   description: string;
   category_id: string | null;
-  account: { name: string } | null;
-  invoice: { card: { name: string } } | null;
+  account: ({ name: string } & Institution) | null;
+  invoice: { card: { name: string } & Institution } | null;
 }
 
 interface Invoice {
@@ -75,16 +76,6 @@ interface CreditCard {
   color: string | null;
   style: string | null;
   last_digits: string | null;
-}
-
-function initials(text: string): string {
-  return text
-    .split(/\s+/)
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((word) => word[0])
-    .join("")
-    .toUpperCase();
 }
 
 export default async function DashboardPage({
@@ -113,8 +104,8 @@ export default async function DashboardPage({
       .from("transactions")
       .select(
         `id, type, status, amount_cents, date, description, category_id,
-         account:accounts!transactions_account_id_fkey(name),
-         invoice:invoices(card:credit_cards(name))`,
+         account:accounts!transactions_account_id_fkey(name, institution_name, institution_logo, institution_color),
+         invoice:invoices(card:credit_cards(name, institution_name, institution_logo, institution_color))`,
       )
       .gte("date", start)
       .lt("date", end)
@@ -605,12 +596,10 @@ export default async function DashboardPage({
               <ul>
                 {rows.slice(0, 8).map((row) => (
                   <li key={row.id} className="flex items-center gap-3 py-3">
-                    <span
-                      className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-soft text-xs font-semibold"
-                      aria-hidden
-                    >
-                      {initials(row.description)}
-                    </span>
+                    <BankIcon
+                      institution={row.account ?? row.invoice?.card}
+                      fallbackName={row.account?.name ?? row.invoice?.card.name ?? row.description}
+                    />
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-sm">{row.description}</p>
                       <p className="text-xs text-muted">

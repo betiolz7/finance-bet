@@ -1,6 +1,5 @@
 import Link from "next/link";
 import { CreditCardVisual } from "@/components/credit-card-visual";
-import { ActionForm, SubmitButton } from "@/components/forms";
 import {
   Card,
   EmptyState,
@@ -12,9 +11,7 @@ import { nextInvoiceToPay, usedLimitCents } from "@/lib/cards";
 import { formatDate } from "@/lib/dates";
 import { formatCents } from "@/lib/money";
 import { requireDb } from "@/lib/supabase/server";
-import { loadFormOptions } from "../lancamentos/queries";
-import { createCard, setCardArchived } from "./actions";
-import { CardFields } from "./card-fields";
+import { setCardArchived } from "./actions";
 
 interface CreditCard {
   id: string;
@@ -38,7 +35,7 @@ interface Invoice {
 
 export default async function CardsPage() {
   const db = await requireDb();
-  const [cards, invoices, options] = await Promise.all([
+  const [cards, invoices] = await Promise.all([
     db
       .from("credit_cards")
       .select("id, name, limit_cents, closing_day, due_day, archived, color, style, last_digits")
@@ -47,7 +44,6 @@ export default async function CardsPage() {
       .from("invoice_totals")
       .select("id, card_id, due_date, paid_at, total_cents")
       .is("paid_at", null),
-    loadFormOptions(),
   ]);
   if (cards.error) throw new Error(cards.error.message);
   if (invoices.error) throw new Error(invoices.error.message);
@@ -71,7 +67,11 @@ export default async function CardsPage() {
 
       {active.length === 0 ? (
         <Card className="mb-4">
-          <EmptyState message="Nenhum cartão cadastrado ainda." />
+          <EmptyState
+            message="Nenhum cartão conectado ainda. Os cartões entram pelo Open Finance."
+            href="/open-finance"
+            linkLabel="Conectar banco"
+          />
         </Card>
       ) : (
         <div className="mb-4 grid gap-4 md:grid-cols-2 2xl:grid-cols-3">
@@ -81,21 +81,6 @@ export default async function CardsPage() {
         </div>
       )}
 
-      <Card className="mb-4">
-        <h2 className="mb-3 font-semibold">Novo cartão</h2>
-        {options.accounts.length === 0 ? (
-          <EmptyState
-            message="Cadastre uma conta antes de adicionar um cartão."
-            href="/contas"
-            linkLabel="Cadastrar conta"
-          />
-        ) : (
-          <ActionForm action={createCard} className="grid items-end gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            <CardFields accounts={options.accounts} />
-            <SubmitButton>Adicionar</SubmitButton>
-          </ActionForm>
-        )}
-      </Card>
 
       {archived.length > 0 && (
         <Card>

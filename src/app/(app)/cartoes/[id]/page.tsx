@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { Card, EmptyState, PageHeader } from "@/components/ui";
+import { CreditCardVisual } from "@/components/credit-card-visual";
+import { Card, EmptyState, PageHeader, secondaryButtonClass } from "@/components/ui";
 import { invoiceStatus } from "@/lib/cards";
 import {
   capitalizeFirst,
@@ -29,7 +30,11 @@ export default async function CardInvoicesPage({
   const { id } = await params;
   const db = await requireDb();
   const [card, invoices] = await Promise.all([
-    db.from("credit_cards").select("name").eq("id", id).maybeSingle(),
+    db
+      .from("credit_cards")
+      .select("name, color, style, last_digits, limit_cents, closing_day, due_day")
+      .eq("id", id)
+      .maybeSingle(),
     db
       .from("invoice_totals")
       .select("id, reference_month, closing_date, due_date, paid_at, total_cents")
@@ -44,10 +49,59 @@ export default async function CardInvoicesPage({
     (invoice) => invoice.total_cents > 0 || invoice.paid_at,
   );
   const today = todayInBrazil();
+  const openCents = rows
+    .filter((invoice) => !invoice.paid_at)
+    .reduce((sum, invoice) => sum + invoice.total_cents, 0);
+  const next = rows
+    .filter((invoice) => !invoice.paid_at && invoice.total_cents > 0)
+    .sort((a, b) => a.due_date.localeCompare(b.due_date))[0];
 
   return (
     <>
-      <PageHeader title={card.data.name} />
+      <PageHeader
+        title={card.data.name}
+        action={
+          <Link href={`/cartoes/${id}/editar`} className={secondaryButtonClass}>
+            Editar cartão
+          </Link>
+        }
+      />
+
+      <Card className="mb-4">
+        <div className="flex flex-wrap items-center gap-6">
+          <div className="w-36 shrink-0 sm:w-40">
+            <CreditCardVisual card={card.data} />
+          </div>
+          <dl className="grid min-w-0 flex-1 basis-56 gap-4 sm:grid-cols-2">
+            <div>
+              <dt className="text-sm text-muted">Próxima fatura</dt>
+              <dd className="whitespace-nowrap text-2xl font-semibold tracking-tight tabular-nums">
+                {formatCents(next?.total_cents ?? 0)}
+              </dd>
+              <dd className="text-xs text-muted">
+                {next ? `Vence ${formatDate(next.due_date)}` : "Nada a pagar"}
+              </dd>
+            </div>
+            {card.data.limit_cents > 0 && (
+              <div>
+                <dt className="text-sm text-muted">Limite disponível</dt>
+                <dd className="whitespace-nowrap text-2xl font-semibold tracking-tight tabular-nums">
+                  {formatCents(card.data.limit_cents - openCents)}
+                </dd>
+                <dd className="text-xs text-muted tabular-nums">
+                  de {formatCents(card.data.limit_cents)}
+                </dd>
+              </div>
+            )}
+            <div className="sm:col-span-2">
+              <dd className="text-xs text-muted">
+                Fecha dia {card.data.closing_day} · Vence dia {card.data.due_day}
+              </dd>
+            </div>
+          </dl>
+        </div>
+      </Card>
+
       <Card>
         {rows.length === 0 ? (
           <EmptyState

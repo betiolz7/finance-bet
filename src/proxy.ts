@@ -1,5 +1,6 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
+import { WEBHOOK_PATH } from "@/lib/webhook-path";
 import {
   isSupabaseConfigured,
   supabaseKey,
@@ -7,6 +8,9 @@ import {
 } from "@/lib/supabase/config";
 
 export async function proxy(request: NextRequest) {
+  // A Pluggy chama este endereço sem login; ele se protege pela senha própria.
+  if (request.nextUrl.pathname === WEBHOOK_PATH) return NextResponse.next();
+
   const isLogin = request.nextUrl.pathname === "/login";
 
   if (!isSupabaseConfigured) {

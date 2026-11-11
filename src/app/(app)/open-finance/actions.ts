@@ -3,13 +3,22 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { describeDbError, type ActionState } from "@/lib/action-state";
-import { isValidDate } from "@/lib/dates";
+import {
+  connectedItemIds,
+  ensureConnectedAccounts,
+} from "@/lib/connected-accounts-server";
+import { normalizeColor, safeLogoUrl } from "@/lib/connected-accounts";
 import {
   mapPluggyTransaction,
   parseReviewDecisions,
   type ReviewDecision,
 } from "@/lib/open-finance";
-import { getItem, isPluggyConfigured, listTransactions } from "@/lib/pluggy";
+import {
+  getConnector,
+  getItem,
+  isPluggyConfigured,
+  listTransactions,
+} from "@/lib/pluggy";
 import { requireDb } from "@/lib/supabase/server";
 
 export async function saveBankItem(itemId: string): Promise<ActionState> {
@@ -27,42 +36,63 @@ export async function saveBankItem(itemId: string): Promise<ActionState> {
     .upsert({ item_id: itemId }, { onConflict: "item_id", ignoreDuplicates: true });
   if (error) return { error: describeDbError(error) };
 
+  try {
+    await ensureConnectedAccounts(db);
+  } catch {
+    return { error: "Conexão salva, mas não foi possível importar as contas agora." };
+  }
+
   revalidatePath("/", "layout");
   return {};
 }
 
-export async function saveBankLink(
-  pluggyAccountId: string,
-  accountType: string,
+export async function refreshConnectedAccounts(): Promise<ActionState> {
+  const db = await requireDb();
+  if (!isPluggyConfigured()) return { error: "A Pluggy não foi configurada." };
+
+  try {
+    const { skipped } = await ensureConnectedAccounts(db);
+    revalidatePath("/", "layout");
+    if (skipped > 0) {
+      return {
+        error:
+          "Cartões sem uma conta bancária conectada ficaram de fora. Conecte a conta do banco e tente de novo.",
+      };
+    }
+    return {};
+  } catch {
+    return { error: "Não foi possível importar as contas. Tente novamente." };
+  }
+}
+
+export async function setItemBank(
+  itemId: string,
   _state: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
   const db = await requireDb();
-  const destination = String(formData.get("destination") ?? "");
-  const importFrom = String(formData.get("importFrom") ?? "");
-
-  if (!destination) {
-    const { error } = await db
-      .from("bank_links")
-      .delete()
-      .eq("pluggy_account_id", pluggyAccountId);
-    if (error) return { error: describeDbError(error) };
-    revalidatePath("/", "layout");
-    return {};
+  const connectorId = Number(formData.get("connectorId"));
+  if (!Number.isInteger(connectorId) || connectorId <= 0) {
+    return { error: "Escolha o banco." };
   }
 
-  if (!isValidDate(importFrom)) return { error: "Informe uma data válida." };
+  const itemIds = await connectedItemIds(db);
+  if (!itemIds.includes(itemId)) return { error: "Conexão não encontrada." };
 
-  const isCard = accountType === "CREDIT";
-  const { error } = await db.from("bank_links").upsert(
-    {
-      pluggy_account_id: pluggyAccountId,
-      account_id: isCard ? null : destination,
-      card_id: isCard ? destination : null,
-      import_from: importFrom,
-    },
-    { onConflict: "pluggy_account_id" },
-  );
+  let connector;
+  try {
+    connector = await getConnector(connectorId);
+  } catch {
+    return { error: "Não foi possível buscar este banco na Pluggy." };
+  }
+
+  const { error } = await db.rpc("set_item_institution", {
+    p_item_id: itemId,
+    p_connector_id: connector.id,
+    p_name: connector.name,
+    p_logo: safeLogoUrl(connector.imageUrl),
+    p_color: normalizeColor(connector.primaryColor),
+  });
   if (error) return { error: describeDbError(error) };
 
   revalidatePath("/", "layout");
@@ -73,12 +103,18 @@ export async function syncBank(): Promise<ActionState> {
   const db = await requireDb();
   if (!isPluggyConfigured()) return { error: "A Pluggy não foi configurada." };
 
+  try {
+    await ensureConnectedAccounts(db);
+  } catch {
+    return { error: "Não foi possível falar com a Pluggy. Tente novamente." };
+  }
+
   const { data: links, error } = await db
     .from("bank_links")
     .select("id, pluggy_account_id, import_from");
   if (error) return { error: describeDbError(error) };
   if (!links || links.length === 0) {
-    return { error: "Ligue ao menos uma conta antes de buscar as transações." };
+    return { error: "Nenhuma conta conectada ainda." };
   }
 
   try {
