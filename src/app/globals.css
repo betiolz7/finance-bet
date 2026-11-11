@@ -9,6 +9,8 @@
   --color-surface: #ffffff;
   --color-soft: #f0f0ee;
   --color-ink: #141414;
+  /* Texto sobre fundo "ink", como nos botões principais. */
+  --color-on-ink: #ffffff;
   --color-muted: #63676b;
   --color-line: #e8e8e5;
   --color-brand: #9bcf53;
@@ -22,6 +24,58 @@
   --color-expense: #a84c15;
   --color-pending: #8a6100;
   --color-pending-soft: #fdf3d3;
+}
+
+/* Tema escuro: cores próprias, validadas contra o fundo escuro, e não uma
+   simples inversão. Vale pela preferência do sistema ou pela escolha manual. */
+@layer base {
+  :root {
+    color-scheme: light;
+  }
+
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --color-canvas: #0e0e0d;
+    --color-surface: #1a1a19;
+    --color-soft: #262624;
+    --color-ink: #f0efec;
+    --color-on-ink: #141414;
+    --color-muted: #a6a59f;
+    --color-line: #31312e;
+    --color-brand: #9bcf53;
+    --color-brand-soft: #24311a;
+    --color-accent: #e5d54f;
+    --color-chart: #6aa531;
+    --color-bar-income: #2f7a1f;
+    --color-bar-expense: #cc7a30;
+    --color-income: #8fcf6a;
+    --color-expense: #f0a070;
+    --color-pending: #e8bf55;
+    --color-pending-soft: #3a2f12;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      color-scheme: dark;
+      --color-canvas: #0e0e0d;
+      --color-surface: #1a1a19;
+      --color-soft: #262624;
+      --color-ink: #f0efec;
+      --color-on-ink: #141414;
+      --color-muted: #a6a59f;
+      --color-line: #31312e;
+      --color-brand: #9bcf53;
+      --color-brand-soft: #24311a;
+      --color-accent: #e5d54f;
+      --color-chart: #6aa531;
+      --color-bar-income: #2f7a1f;
+      --color-bar-expense: #cc7a30;
+      --color-income: #8fcf6a;
+      --color-expense: #f0a070;
+      --color-pending: #e8bf55;
+      --color-pending-soft: #3a2f12;
+    }
+  }
 }
 
 body {

@@ -1,9 +1,10 @@
 import { Bell, Landmark, Plus, Search, Settings } from "lucide-react";
 import Link from "next/link";
 import { Suspense } from "react";
+import { ThemeToggle } from "@/components/theme-toggle";
 import { loadShellData } from "@/lib/shell";
 import { signOut } from "../login/actions";
-import { MobileNav, Sidebar } from "./sidebar";
+import { MobileTabBar, Sidebar } from "./sidebar";
 
 export default function AppLayout({
   children,
@@ -40,23 +41,21 @@ export default function AppLayout({
           </Suspense>
         </header>
 
-        <main className="px-4 pb-24 md:px-8 md:pb-10">
-          <Suspense fallback={null}>
-            <MobileNav />
-          </Suspense>
+        <main className="px-4 pb-32 md:px-8 md:pb-10">
           <div className="mx-auto max-w-[1400px]">{children}</div>
         </main>
       </div>
 
-      <Link
-        href="/lancamentos/novo"
-        className="fixed inset-x-4 bottom-4 flex items-center justify-center gap-2 rounded-xl bg-ink py-3 text-sm font-medium text-white shadow-lg md:hidden"
-      >
-        <Plus className="size-4" aria-hidden />
-        Novo lançamento
-      </Link>
+      <Suspense fallback={null}>
+        <MobileTabBarWithData />
+      </Suspense>
     </div>
   );
+}
+
+async function MobileTabBarWithData() {
+  const { reviewCount } = await loadShellData();
+  return <MobileTabBar reviewCount={reviewCount} signOutAction={signOut} />;
 }
 
 async function SidebarWithData() {
@@ -65,7 +64,7 @@ async function SidebarWithData() {
     <Sidebar reviewCount={reviewCount} signOutAction={signOut}>
       {reviewCount > 0 && (
         <div className="mb-2 rounded-2xl border border-line p-4">
-          <span className="mb-3 flex size-9 items-center justify-center rounded-full bg-ink text-white">
+          <span className="mb-3 flex size-9 items-center justify-center rounded-full bg-ink text-on-ink">
             <Landmark className="size-4" aria-hidden />
           </span>
           <p className="text-lg font-semibold leading-tight">
@@ -76,7 +75,7 @@ async function SidebarWithData() {
           </p>
           <Link
             href="/open-finance/revisar"
-            className="mt-4 flex justify-center rounded-xl bg-ink py-2.5 text-sm font-medium text-white"
+            className="mt-4 flex justify-center rounded-xl bg-ink py-2.5 text-sm font-medium text-on-ink"
           >
             Revisar agora
           </Link>
@@ -94,6 +93,7 @@ async function TopBarActions() {
 
   return (
     <div className="ml-auto flex items-center gap-2">
+      <ThemeToggle className={iconButton} />
       <Link
         href="/open-finance/revisar"
         className={iconButton}

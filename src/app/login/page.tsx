@@ -28,7 +28,7 @@ export default function LoginPage() {
                 className={inputClass}
               />
             </Field>
-            <SubmitButton className="inline-flex w-full items-center justify-center rounded-lg bg-ink px-4 py-2 text-sm font-medium text-white disabled:opacity-60">
+            <SubmitButton className="inline-flex w-full items-center justify-center rounded-xl bg-ink px-4 py-2.5 text-sm font-medium text-on-ink disabled:opacity-60">
               Entrar
             </SubmitButton>
           </ActionForm>

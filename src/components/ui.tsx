@@ -4,7 +4,7 @@ export const inputClass =
   "w-full rounded-xl border border-line bg-surface px-3 py-2.5 text-sm outline-none focus:border-ink";
 
 export const primaryButtonClass =
-  "inline-flex items-center justify-center rounded-xl bg-ink px-4 py-2.5 text-sm font-medium text-white hover:bg-black disabled:opacity-60";
+  "inline-flex items-center justify-center rounded-xl bg-ink px-4 py-2.5 text-sm font-medium text-on-ink hover:opacity-90 disabled:opacity-60";
 
 export const secondaryButtonClass =
   "inline-flex items-center justify-center rounded-xl border border-line bg-surface px-3 py-2.5 text-sm font-medium hover:bg-soft disabled:opacity-60";
