@@ -51,6 +51,23 @@ export interface PluggyTransaction {
   } | null;
 }
 
+export interface PluggyInvestment {
+  id: string;
+  itemId: string;
+  name: string;
+  type: string;
+  subtype?: string | null;
+  currencyCode: string;
+  balance: number;
+  amountOriginal?: number | null;
+  amountProfit?: number | null;
+  rateType?: string | null;
+  dueDate?: string | null;
+  issuer?: string | null;
+  status?: string | null;
+  institution?: { name?: string | null } | null;
+}
+
 export function pluggyItemIds(): string[] {
   return (process.env.PLUGGY_ITEM_IDS ?? "")
     .split(",")
@@ -113,6 +130,21 @@ export async function listAccounts(itemId: string): Promise<PluggyAccount[]> {
   const params = new URLSearchParams({ itemId });
   const { results } = await get<{ results: PluggyAccount[] }>(`/accounts?${params}`);
   return results;
+}
+
+export async function listInvestments(itemId: string): Promise<PluggyInvestment[]> {
+  const all: PluggyInvestment[] = [];
+  for (let page = 1; ; page++) {
+    if (page > MAX_TRANSACTION_PAGES) {
+      throw new PluggyError("A Pluggy devolveu páginas demais.");
+    }
+    const params = new URLSearchParams({ itemId, page: String(page) });
+    const body: { results: PluggyInvestment[]; totalPages?: number } = await get(
+      `/investments?${params}`,
+    );
+    all.push(...body.results);
+    if (!body.totalPages || page >= body.totalPages) return all;
+  }
 }
 
 export async function listTransactions(

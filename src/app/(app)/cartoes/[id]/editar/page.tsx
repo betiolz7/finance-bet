@@ -16,7 +16,7 @@ export default async function EditCardPage({
   const db = await requireDb();
   const { data } = await db
     .from("credit_cards")
-    .select("name, limit_cents, closing_day, due_day, payment_account_id")
+    .select("name, limit_cents, closing_day, due_day, payment_account_id, color, style, last_digits")
     .eq("id", id)
     .maybeSingle();
   if (!data) notFound();
@@ -35,6 +35,9 @@ export default async function EditCardPage({
             closingDay={String(data.closing_day)}
             dueDay={String(data.due_day)}
             accountId={data.payment_account_id}
+            color={data.color ?? ""}
+            style={data.style ?? ""}
+            lastDigits={data.last_digits ?? ""}
           />
           <p className="text-sm text-muted">
             Mudar os dias de fechamento ou vencimento vale apenas para faturas

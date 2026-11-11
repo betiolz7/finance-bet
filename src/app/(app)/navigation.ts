@@ -5,6 +5,7 @@ import {
   PiggyBank,
   Tags,
   Target,
+  TrendingUp,
   Wallet,
   type LucideIcon,
 } from "lucide-react";
@@ -31,6 +32,7 @@ export const MAIN_NAV: NavItem[] = [
   { href: "/cartoes", label: "Cartões", icon: CreditCard },
   { href: "/orcamento", label: "Orçamento", icon: PiggyBank },
   { href: "/metas", label: "Metas", icon: Target },
+  { href: "/investimentos", label: "Investimentos", icon: TrendingUp },
   { href: "/contas", label: "Contas", icon: Wallet },
 ];
 

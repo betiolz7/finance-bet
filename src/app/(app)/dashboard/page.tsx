@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { BudgetStatus } from "@/components/budget-status";
+import { CreditCardVisual } from "@/components/credit-card-visual";
 import { MonthNav } from "@/components/month-nav";
 import { Card, EmptyState, textButtonClass } from "@/components/ui";
 import { nextInvoiceToPay, usedLimitCents } from "@/lib/cards";
@@ -71,6 +72,9 @@ interface CreditCard {
   id: string;
   name: string;
   limit_cents: number;
+  color: string | null;
+  style: string | null;
+  last_digits: string | null;
 }
 
 function initials(text: string): string {
@@ -141,7 +145,7 @@ export default async function DashboardPage({
       .is("paid_at", null),
     db
       .from("credit_cards")
-      .select("id, name, limit_cents")
+      .select("id, name, limit_cents, color, style, last_digits")
       .eq("archived", false)
       .order("name"),
     db.from("categories").select("id, name, color").eq("kind", "expense"),
@@ -494,16 +498,32 @@ export default async function DashboardPage({
               />
             ) : (
               <div className="-mx-1 flex snap-x gap-3 overflow-x-auto px-1 pb-1">
-                {cards.map((card, index) => {
+                {cards.map((card) => {
                   const invoices = openInvoices.filter((i) => i.card_id === card.id);
+                  const next = nextInvoiceToPay(invoices);
                   return (
-                    <CardVisual
+                    <Link
                       key={card.id}
-                      card={card}
-                      next={nextInvoiceToPay(invoices)}
-                      used={usedLimitCents(invoices)}
-                      highlight={index === 0}
-                    />
+                      href={next ? `/faturas/${next.id}` : `/cartoes/${card.id}`}
+                      className="group w-36 shrink-0 snap-start"
+                    >
+                      <CreditCardVisual
+                        card={card}
+                        className="transition group-hover:-translate-y-1"
+                      />
+                      <p className="mt-3 text-xs text-muted">Fatura a pagar</p>
+                      <p className="whitespace-nowrap font-semibold tabular-nums">
+                        {formatCents(next?.total_cents ?? 0)}
+                      </p>
+                      <p className="text-xs text-muted">
+                        {next ? `Vence ${formatDate(next.due_date)}` : "Nada a pagar"}
+                      </p>
+                      {card.limit_cents > 0 && (
+                        <p className="text-xs text-muted tabular-nums">
+                          Disponível {formatCents(card.limit_cents - usedLimitCents(invoices))}
+                        </p>
+                      )}
+                    </Link>
                   );
                 })}
               </div>
@@ -674,47 +694,6 @@ function CategoryLegend({
       <span className="min-w-0 flex-1 truncate">{name}</span>
       <span className="tabular-nums">{Math.round(percent)}%</span>
     </li>
-  );
-}
-
-function CardVisual({
-  card,
-  next,
-  used,
-  highlight,
-}: {
-  card: CreditCard;
-  next?: Invoice;
-  used: number;
-  highlight: boolean;
-}) {
-  return (
-    <Link
-      href={next ? `/faturas/${next.id}` : `/cartoes/${card.id}`}
-      className={`flex h-44 w-[85%] shrink-0 snap-start flex-col justify-between rounded-2xl p-4 ${
-        highlight ? "hatch bg-brand" : "bg-soft"
-      }`}
-    >
-      <div className="flex items-start justify-between gap-2 text-xs">
-        <span>Cartão de crédito</span>
-        <span className="truncate text-base font-bold">{card.name}</span>
-      </div>
-      <span className="h-6 w-9 rounded-md border border-ink/30 bg-white/40" aria-hidden />
-      <div>
-        <p className="text-xs">Fatura a pagar</p>
-        <p className="text-xl font-semibold tabular-nums">
-          {formatCents(next?.total_cents ?? 0)}
-        </p>
-      </div>
-      <div className="flex items-end justify-between gap-2 text-xs">
-        <span>{next ? `Vence ${formatDate(next.due_date)}` : "Nada a pagar"}</span>
-        {card.limit_cents > 0 && (
-          <span className="tabular-nums">
-            Disponível {formatCents(card.limit_cents - used)}
-          </span>
-        )}
-      </div>
-    </Link>
   );
 }
 

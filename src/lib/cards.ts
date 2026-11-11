@@ -1,3 +1,4 @@
+import { isCardStyle } from "./card-style";
 import { isValidDate } from "./dates";
 import { parseMoneyToCents } from "./money";
 
@@ -14,6 +15,9 @@ export interface CardRow {
   closing_day: number;
   due_day: number;
   payment_account_id: string;
+  color: string | null;
+  style: string | null;
+  last_digits: string | null;
 }
 
 export function parseCardInput(fields: {
@@ -22,6 +26,9 @@ export function parseCardInput(fields: {
   closingDay: string;
   dueDay: string;
   accountId: string;
+  color?: string;
+  style?: string;
+  lastDigits?: string;
 }): { ok: true; data: CardRow } | { ok: false; error: string } {
   const fail = (error: string) => ({ ok: false as const, error });
 
@@ -39,6 +46,17 @@ export function parseCardInput(fields: {
 
   if (!fields.accountId) return fail("Escolha a conta de pagamento.");
 
+  const color = fields.color?.trim().toLowerCase() || null;
+  if (color && !/^#[0-9a-f]{6}$/.test(color)) return fail("Escolha uma cor válida.");
+
+  const style = fields.style?.trim() || null;
+  if (style && !isCardStyle(style)) return fail("Escolha um visual válido.");
+
+  const lastDigits = fields.lastDigits?.trim() || null;
+  if (lastDigits && !/^[0-9]{4}$/.test(lastDigits)) {
+    return fail("Informe apenas os 4 últimos dígitos do cartão.");
+  }
+
   return {
     ok: true,
     data: {
@@ -47,6 +65,9 @@ export function parseCardInput(fields: {
       closing_day: closingDay,
       due_day: dueDay,
       payment_account_id: fields.accountId,
+      color,
+      style,
+      last_digits: lastDigits,
     },
   };
 }

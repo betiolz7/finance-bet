@@ -11,12 +11,17 @@ import { requireDb } from "@/lib/supabase/server";
 
 function parseCardForm(formData: FormData) {
   const read = (key: string) => String(formData.get(key) ?? "");
+  // O campo "visual" vem como "style:<modelo>", "color:<hex>" ou vazio.
+  const look = read("look");
   return parseCardInput({
     name: read("name"),
     limit: read("limit"),
     closingDay: read("closingDay"),
     dueDay: read("dueDay"),
     accountId: read("accountId"),
+    color: look.startsWith("color:") ? look.slice(6) : "",
+    style: look.startsWith("style:") ? look.slice(6) : "",
+    lastDigits: read("lastDigits"),
   });
 }
 

@@ -1,6 +1,13 @@
 import Link from "next/link";
+import { CreditCardVisual } from "@/components/credit-card-visual";
 import { ActionForm, SubmitButton } from "@/components/forms";
-import { Card, EmptyState, PageHeader, textButtonClass } from "@/components/ui";
+import {
+  Card,
+  EmptyState,
+  PageHeader,
+  secondaryButtonClass,
+  textButtonClass,
+} from "@/components/ui";
 import { nextInvoiceToPay, usedLimitCents } from "@/lib/cards";
 import { formatDate } from "@/lib/dates";
 import { formatCents } from "@/lib/money";
@@ -16,6 +23,9 @@ interface CreditCard {
   closing_day: number;
   due_day: number;
   archived: boolean;
+  color: string | null;
+  style: string | null;
+  last_digits: string | null;
 }
 
 interface Invoice {
@@ -31,7 +41,7 @@ export default async function CardsPage() {
   const [cards, invoices, options] = await Promise.all([
     db
       .from("credit_cards")
-      .select("id, name, limit_cents, closing_day, due_day, archived")
+      .select("id, name, limit_cents, closing_day, due_day, archived, color, style, last_digits")
       .order("name"),
     db
       .from("invoice_totals")
@@ -43,26 +53,35 @@ export default async function CardsPage() {
   if (invoices.error) throw new Error(invoices.error.message);
 
   const allCards = cards.data as CreditCard[];
+  const active = allCards.filter((card) => !card.archived);
+  const archived = allCards.filter((card) => card.archived);
   const open = invoices.data as Invoice[];
   const forCard = (id: string) => open.filter((i) => i.card_id === id);
 
   return (
     <>
-      <PageHeader title="Cartões" />
+      <PageHeader
+        title="Cartões"
+        action={
+          <Link href="/cartoes/modelos" className={secondaryButtonClass}>
+            Ver modelos de cartão
+          </Link>
+        }
+      />
+
+      {active.length === 0 ? (
+        <Card className="mb-4">
+          <EmptyState message="Nenhum cartão cadastrado ainda." />
+        </Card>
+      ) : (
+        <div className="mb-4 grid gap-4 md:grid-cols-2 2xl:grid-cols-3">
+          {active.map((card) => (
+            <CardTile key={card.id} card={card} invoices={forCard(card.id)} />
+          ))}
+        </div>
+      )}
 
       <Card className="mb-4">
-        {allCards.length === 0 ? (
-          <EmptyState message="Nenhum cartão cadastrado ainda." />
-        ) : (
-          <ul className="divide-y divide-line">
-            {allCards.map((card) => (
-              <CardItem key={card.id} card={card} invoices={forCard(card.id)} />
-            ))}
-          </ul>
-        )}
-      </Card>
-
-      <Card>
         <h2 className="mb-3 font-semibold">Novo cartão</h2>
         {options.accounts.length === 0 ? (
           <EmptyState
@@ -71,42 +90,88 @@ export default async function CardsPage() {
             linkLabel="Cadastrar conta"
           />
         ) : (
-          <ActionForm action={createCard} className="grid items-end gap-4 sm:grid-cols-3">
+          <ActionForm action={createCard} className="grid items-end gap-4 sm:grid-cols-2 lg:grid-cols-4">
             <CardFields accounts={options.accounts} />
             <SubmitButton>Adicionar</SubmitButton>
           </ActionForm>
         )}
       </Card>
+
+      {archived.length > 0 && (
+        <Card>
+          <h2 className="mb-1 font-semibold">Arquivados</h2>
+          <ul className="divide-y divide-line">
+            {archived.map((card) => (
+              <li key={card.id} className="flex items-center justify-between gap-3 py-3">
+                <span className="text-sm">{card.name}</span>
+                <form action={setCardArchived.bind(null, card.id, false)}>
+                  <button type="submit" className={textButtonClass}>
+                    Reativar
+                  </button>
+                </form>
+              </li>
+            ))}
+          </ul>
+        </Card>
+      )}
     </>
   );
 }
 
-function CardItem({ card, invoices }: { card: CreditCard; invoices: Invoice[] }) {
+function CardTile({ card, invoices }: { card: CreditCard; invoices: Invoice[] }) {
   const used = usedLimitCents(invoices);
   const next = nextInvoiceToPay(invoices);
   const percent =
     card.limit_cents > 0 ? Math.min(100, (used / card.limit_cents) * 100) : 0;
 
   return (
-    <li className="py-4">
-      <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1">
-        <div className="min-w-0 flex-1 basis-48">
-          <Link href={`/cartoes/${card.id}`} className="text-sm font-medium hover:underline">
-            {card.name}
-          </Link>
-          <p className="text-xs text-muted">
-            Fecha dia {card.closing_day} · Vence dia {card.due_day}
-            {card.archived && " · Arquivado"}
+    <Card className="flex flex-col gap-4">
+      <div className="flex gap-5">
+        <Link
+          href={next ? `/faturas/${next.id}` : `/cartoes/${card.id}`}
+          className="w-32 shrink-0 sm:w-36"
+        >
+          <CreditCardVisual card={card} className="transition hover:-translate-y-1" />
+        </Link>
+        <div className="flex min-w-0 flex-1 flex-col justify-center gap-3">
+          <div>
+            <p className="text-sm text-muted">Fatura a pagar</p>
+            <p className="whitespace-nowrap text-2xl font-semibold tracking-tight tabular-nums">
+              {formatCents(next?.total_cents ?? 0)}
+            </p>
+            <p className="text-xs text-muted">
+              {next ? `Vence ${formatDate(next.due_date)}` : "Nada a pagar"}
+            </p>
+          </div>
+          {card.limit_cents > 0 && (
+            <div>
+              <p className="text-sm text-muted">Limite disponível</p>
+              <p className="whitespace-nowrap font-semibold tabular-nums">
+                {formatCents(card.limit_cents - used)}
+              </p>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {card.limit_cents > 0 && (
+        <div>
+          <div className="h-2 overflow-hidden rounded-full bg-soft">
+            <div
+              className={`h-full rounded-full ${percent >= 80 ? "bg-expense" : "bg-chart"}`}
+              style={{ width: `${percent}%` }}
+            />
+          </div>
+          <p className="mt-1 text-xs text-muted tabular-nums">
+            {formatCents(used)} usados de {formatCents(card.limit_cents)}
           </p>
         </div>
-        {next && (
-          <div className="text-right">
-            <p className="text-sm font-semibold tabular-nums">
-              {formatCents(next.total_cents)}
-            </p>
-            <p className="text-xs text-muted">vence {formatDate(next.due_date)}</p>
-          </div>
-        )}
+      )}
+
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <p className="text-xs text-muted">
+          Fecha dia {card.closing_day} · Vence dia {card.due_day}
+        </p>
         <div className="flex items-center gap-3">
           <Link href={`/cartoes/${card.id}`} className={textButtonClass}>
             Faturas
@@ -114,28 +179,13 @@ function CardItem({ card, invoices }: { card: CreditCard; invoices: Invoice[] })
           <Link href={`/cartoes/${card.id}/editar`} className={textButtonClass}>
             Editar
           </Link>
-          <form action={setCardArchived.bind(null, card.id, !card.archived)}>
+          <form action={setCardArchived.bind(null, card.id, true)}>
             <button type="submit" className={textButtonClass}>
-              {card.archived ? "Reativar" : "Arquivar"}
+              Arquivar
             </button>
           </form>
         </div>
       </div>
-
-      {card.limit_cents > 0 && (
-        <div className="mt-3">
-          <div className="h-2 overflow-hidden rounded-full bg-canvas">
-            <div
-              className={`h-full rounded-full ${percent >= 80 ? "bg-expense" : "bg-chart"}`}
-              style={{ width: `${percent}%` }}
-            />
-          </div>
-          <p className="mt-1 text-xs text-muted tabular-nums">
-            {formatCents(used)} usados de {formatCents(card.limit_cents)} · disponível{" "}
-            {formatCents(card.limit_cents - used)}
-          </p>
-        </div>
-      )}
-    </li>
+    </Card>
   );
 }
