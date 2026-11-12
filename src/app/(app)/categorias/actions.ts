@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { describeDbError, type ActionState } from "@/lib/action-state";
+import { parseRuleInput } from "@/lib/category-rules";
 import { requireDb } from "@/lib/supabase/server";
 
 const DEFAULT_CATEGORIES = [
@@ -69,6 +70,38 @@ export async function deleteCategory(id: string): Promise<ActionState> {
 
   revalidatePath("/", "layout");
   return {};
+}
+
+export async function createRule(
+  _state: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  const db = await requireDb();
+  const parsed = parseRuleInput({
+    pattern: String(formData.get("pattern") ?? ""),
+    categoryId: String(formData.get("categoryId") ?? ""),
+  });
+  if (!parsed.ok) return { error: parsed.error };
+
+  const { error } = await db.from("category_rules").insert(parsed.data);
+  if (error) {
+    return {
+      error:
+        error.code === "23505"
+          ? "Já existe uma regra com esse texto."
+          : describeDbError(error),
+    };
+  }
+
+  revalidatePath("/", "layout");
+  return {};
+}
+
+export async function deleteRule(id: string) {
+  const db = await requireDb();
+  const { error } = await db.from("category_rules").delete().eq("id", id);
+  if (error) throw new Error(error.message);
+  revalidatePath("/", "layout");
 }
 
 export async function createDefaultCategories() {

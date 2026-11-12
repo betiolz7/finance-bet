@@ -6,7 +6,11 @@ import {
   webhookUrl,
 } from "@/lib/notifications";
 import { listWebhooks } from "@/lib/pluggy";
-import { activateNotifications, sendTestEmail } from "./notification-actions";
+import {
+  activateNotifications,
+  sendMonthlySummaryNow,
+  sendTestEmail,
+} from "./notification-actions";
 
 async function isActive(url: string | null): Promise<boolean | null> {
   if (!url) return false;
@@ -27,7 +31,8 @@ export async function NotificationsCard() {
 
   return (
     <Card className="mb-4">
-      <h2 className="mb-1 font-semibold">Aviso de entrada por e-mail</h2>
+      <h2 className="mb-1 font-semibold">Avisos por e-mail</h2>
+      <h3 className="mt-3 text-sm font-semibold">Entrada de dinheiro</h3>
       <p className="mb-3 text-sm text-muted">
         Quando chegar dinheiro numa conta conectada, você recebe um e-mail. O aviso
         sai quando a Pluggy atualiza os dados, normalmente uma vez por dia, e não no
@@ -58,6 +63,24 @@ export async function NotificationsCard() {
           </ActionForm>
         </div>
       )}
+
+      <div className="mt-5 border-t border-line pt-4">
+        <h3 className="text-sm font-semibold">Resumo mensal</h3>
+        <p className="mt-1 mb-3 text-sm text-muted">
+          Todo dia 1º, um e-mail com receitas, despesas, sobra, maiores gastos e
+          orçamentos estourados do mês anterior.
+          {!process.env.SUPABASE_SECRET_KEY || !process.env.CRON_SECRET
+            ? " O envio automático precisa das variáveis SUPABASE_SECRET_KEY e CRON_SECRET na Vercel."
+            : ""}
+        </p>
+        {emailReady && (
+          <ActionForm action={sendMonthlySummaryNow}>
+            <SubmitButton className={secondaryButtonClass}>
+              Enviar resumo do mês passado agora
+            </SubmitButton>
+          </ActionForm>
+        )}
+      </div>
     </Card>
   );
 }

@@ -5,6 +5,7 @@ import {
   normalizeName,
   type ExpenseHistoryItem,
 } from "./import";
+import { categoryFromRules, type CategoryRule } from "./category-rules";
 import { centsToInput, parseMoneyToCents } from "./money";
 import type { PluggyTransaction } from "./pluggy";
 
@@ -62,18 +63,57 @@ export interface PendingExpense {
   account_id: string | null;
 }
 
-export type ReviewChoice = "create" | "ignore" | `match:${string}`;
+export type ReviewChoice =
+  | "create"
+  | "ignore"
+  | `match:${string}`
+  | `transfer:${string}`;
 
 export interface ReviewItem extends ReviewInput {
   kind: "expense" | "income";
   canCreate: boolean;
   candidates: { id: string; description: string }[];
+  /** Entrada em outra conta sua que forma uma transferência com esta saída. */
+  transferTo?: { id: string; accountName: string };
   defaultChoice: ReviewChoice;
   defaultCategoryId: string;
   note: string | null;
 }
 
 const INVOICE_PAYMENT = /fatura|credit card payment|pagamento de cart/i;
+const TRANSFER_WINDOW_DAYS = 2;
+
+function daysBetween(a: string, b: string): number {
+  return Math.abs(Date.parse(`${a}T00:00:00Z`) - Date.parse(`${b}T00:00:00Z`)) / 86_400_000;
+}
+
+/**
+ * Saída de uma conta sua e entrada de mesmo valor em outra conta sua, com até
+ * 2 dias de diferença: é uma transferência, não despesa mais receita.
+ * Devolve, para cada saída, a entrada que forma o par.
+ */
+export function pairTransfers(rows: ReviewInput[]): Map<string, ReviewInput> {
+  const pairs = new Map<string, ReviewInput>();
+  const used = new Set<string>();
+  const credits = rows.filter((r) => r.direction === "credit" && r.accountId);
+  for (const debit of rows) {
+    if (debit.direction !== "debit" || !debit.accountId) continue;
+    const match = credits
+      .filter(
+        (credit) =>
+          !used.has(credit.id) &&
+          credit.accountId !== debit.accountId &&
+          credit.amount_cents === debit.amount_cents &&
+          daysBetween(credit.date, debit.date) <= TRANSFER_WINDOW_DAYS,
+      )
+      .sort((a, b) => daysBetween(a.date, debit.date) - daysBetween(b.date, debit.date))[0];
+    if (match) {
+      pairs.set(debit.id, match);
+      used.add(match.id);
+    }
+  }
+  return pairs;
+}
 
 export function buildReviewItems(
   rows: ReviewInput[],
@@ -81,6 +121,7 @@ export function buildReviewItems(
     pending: PendingExpense[];
     paidHistory: ExpenseHistoryItem[];
     categories: { id: string; name: string; kind: "income" | "expense" }[];
+    rules?: CategoryRule[];
   },
 ): ReviewItem[] {
   const suggestions = buildCategorySuggestions(context.paidHistory);
@@ -88,18 +129,25 @@ export function buildReviewItems(
   const sameDayAmount = new Set(
     context.paidHistory.map((item) => `${item.date}|${item.amount_cents}`),
   );
+  const transfers = pairTransfers(rows);
+  const pairedCredits = new Map(
+    [...transfers.entries()].map(([debitId, credit]) => [credit.id, debitId]),
+  );
+  const debitById = new Map(rows.map((row) => [row.id, row]));
 
   return rows.map((row) => {
     const isCard = row.cardId !== null;
     const kind = row.direction === "credit" && !isCard ? "income" : "expense";
+    const fitsKind = (id: string) =>
+      context.categories.some((c) => c.id === id && c.kind === kind);
     const fallback = context.categories.find(
       (c) => kind === "expense" && normalizeName(c.name) === "imprevistos",
     );
+    // Prioridade: regra automática, depois o que você já usou, depois Imprevistos.
+    const fromRule = categoryFromRules(row.description, context.rules ?? [], fitsKind);
     const suggested = suggestions.get(normalizeName(row.description));
     const defaultCategoryId =
-      suggested && context.categories.some((c) => c.id === suggested && c.kind === kind)
-        ? suggested
-        : (fallback?.id ?? "");
+      fromRule ?? (suggested && fitsKind(suggested) ? suggested : (fallback?.id ?? ""));
 
     const base = {
       ...row,
@@ -115,6 +163,26 @@ export function buildReviewItems(
         canCreate: false,
         defaultChoice: "ignore",
         note: "Pagamento ou estorno no cartão. Não vira gasto.",
+      };
+    }
+
+    const credit = transfers.get(row.id);
+    if (credit) {
+      return {
+        ...base,
+        transferTo: { id: credit.id, accountName: credit.linkName },
+        defaultChoice: `transfer:${credit.id}` as const,
+        note: `Mesmo valor entrou em ${credit.linkName}. Parece transferência entre suas contas.`,
+      };
+    }
+
+    const pairedDebitId = pairedCredits.get(row.id);
+    if (pairedDebitId) {
+      const debit = debitById.get(pairedDebitId);
+      return {
+        ...base,
+        defaultChoice: "ignore",
+        note: `Entrada da transferência vinda de ${debit?.linkName ?? "outra conta sua"}. Fica junto com ela.`,
       };
     }
 
@@ -186,9 +254,10 @@ export type ParsedReview =
       ok: true;
       data: {
         id: string;
-        action: "create" | "match" | "ignore";
+        action: "create" | "match" | "ignore" | "transfer";
         category_id?: string;
         match_id?: string;
+        pair_id?: string;
       }[];
     }
   | { ok: false; error: string };
@@ -207,6 +276,8 @@ export function parseReviewDecisions(decisions: ReviewDecision[]): ParsedReview 
         return { ok: false, error: "Escolha a categoria de todas as transações a lançar." };
       }
       data.push({ id, action: "create", category_id: categoryId });
+    } else if (choice.startsWith("transfer:") && choice.length > 9) {
+      data.push({ id, action: "transfer", pair_id: choice.slice(9) });
     } else if (choice.startsWith("match:") && choice.length > 6) {
       data.push({ id, action: "match", match_id: choice.slice(6) });
     } else {

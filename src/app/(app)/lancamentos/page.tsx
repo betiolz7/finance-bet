@@ -52,7 +52,8 @@ export default async function TransactionsPage({
 }) {
   const { mes, busca, tipo } = await searchParams;
   const search = busca?.trim().slice(0, 100) ?? "";
-  const tab: Tab = tipo === "receitas" || tipo === "despesas" ? tipo : "todos";
+  const tab: Tab =
+    tipo === "receitas" || tipo === "despesas" || tipo === "transferencias" ? tipo : "todos";
   const db = await requireDb();
   await ensureRecurringGenerated();
 
@@ -84,8 +85,18 @@ export default async function TransactionsPage({
   const summary = summarizeMonth(allRows);
   const incomeRows = allRows.filter((row) => row.type === "income");
   const expenseRows = allRows.filter((row) => row.type === "expense");
+  // Movimentos entre contas suas e pagamentos de fatura: nem receita nem despesa.
+  const transferRows = allRows.filter(
+    (row) => row.type === "transfer" || row.type === "invoice_payment",
+  );
   const rows =
-    tab === "receitas" ? incomeRows : tab === "despesas" ? expenseRows : allRows;
+    tab === "receitas"
+      ? incomeRows
+      : tab === "despesas"
+        ? expenseRows
+        : tab === "transferencias"
+          ? transferRows
+          : allRows;
 
   // Filtros que a troca de aba e de mês precisam manter.
   const keep: Record<string, string> = search ? { busca: search } : { mes: month };
@@ -97,7 +108,9 @@ export default async function TransactionsPage({
       ? "Nenhuma receita neste mês."
       : tab === "despesas"
         ? "Nenhuma despesa neste mês."
-        : "Nenhum lançamento neste mês.";
+        : tab === "transferencias"
+          ? "Nenhuma transferência neste mês."
+          : "Nenhum lançamento neste mês.";
 
   return (
     <>
@@ -142,19 +155,23 @@ export default async function TransactionsPage({
       </div>
 
       <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
-        <nav aria-label="Tipo de lançamento" className="flex gap-1 rounded-xl bg-surface p-1">
+        <nav
+          aria-label="Tipo de lançamento"
+          className="no-scrollbar flex max-w-full gap-1 overflow-x-auto rounded-xl bg-surface p-1"
+        >
           {(
             [
               ["todos", "Todos", allRows.length],
               ["receitas", "Receitas", incomeRows.length],
               ["despesas", "Despesas", expenseRows.length],
+              ["transferencias", "Transferências", transferRows.length],
             ] as const
           ).map(([value, label, count]) => (
             <Link
               key={value}
               href={tabHref(value)}
               aria-current={tab === value ? "page" : undefined}
-              className={`rounded-lg px-3 py-1.5 text-sm ${
+              className={`shrink-0 rounded-lg px-3 py-1.5 text-sm whitespace-nowrap ${
                 tab === value ? "bg-ink font-medium text-on-ink" : "text-muted hover:text-ink"
               }`}
             >
@@ -162,7 +179,7 @@ export default async function TransactionsPage({
             </Link>
           ))}
         </nav>
-        {tab !== "todos" && (
+        {(tab === "receitas" || tab === "despesas") && (
           <Link
             href={`/lancamentos/novo?tipo=${tab === "receitas" ? "receita" : "despesa"}`}
             className={textButtonClass}
@@ -170,6 +187,24 @@ export default async function TransactionsPage({
             + Nova {tab === "receitas" ? "receita" : "despesa"}
           </Link>
         )}
+        <div className="flex items-center gap-4">
+          {tab === "transferencias" && (
+            <Link href="/lancamentos/novo?tipo=transferencia" className={textButtonClass}>
+              + Nova transferência
+            </Link>
+          )}
+          {!search && (
+            <a
+              href={`/api/exportar?${new URLSearchParams(
+                tab === "todos" ? { mes: month } : { mes: month, tipo: tab },
+              )}`}
+              className={textButtonClass}
+              download
+            >
+              Exportar Excel
+            </a>
+          )}
+        </div>
       </div>
 
       <Card>
@@ -195,7 +230,7 @@ export default async function TransactionsPage({
   );
 }
 
-type Tab = "todos" | "receitas" | "despesas";
+type Tab = "todos" | "receitas" | "despesas" | "transferencias";
 
 function Summary({
   label,

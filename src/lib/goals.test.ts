@@ -60,12 +60,24 @@ describe("goalProgress", () => {
     const counts = countGoalsByAccount([{ account_id: "a" }, { account_id: "a" }]);
     expect(goalProgress(goal, new Map(), counts, today).sharedAccount).toBe(true);
   });
+
+  it("meta ligada a investimento usa o saldo do investimento", () => {
+    const investmentGoal = { ...goal, account_id: null, investment_id: "cdb1" };
+    const progressOf = goalProgress(
+      investmentGoal,
+      new Map([["inv:cdb1", 40000], ["a", 99999]]),
+      countGoalsByAccount([investmentGoal]),
+      today,
+    );
+    expect(progressOf.savedCents).toBe(40000);
+    expect(progressOf.sharedAccount).toBe(false);
+  });
 });
 
 describe("parseGoalInput", () => {
-  const valid = { name: " Viagem ", target: "4.000,00", deadline: "2027-07-01", accountId: "a" };
+  const valid = { name: " Viagem ", target: "4.000,00", deadline: "2027-07-01", source: "acc:a" };
 
-  it("aceita uma meta válida", () => {
+  it("aceita uma meta ligada a conta", () => {
     expect(parseGoalInput(valid)).toEqual({
       ok: true,
       data: {
@@ -73,15 +85,32 @@ describe("parseGoalInput", () => {
         target_cents: 400000,
         deadline: "2027-07-01",
         account_id: "a",
+        investment_id: null,
+        investment_name: null,
       },
     });
+  });
+
+  it("aceita uma meta ligada a investimento, com o nome vindo do servidor", () => {
+    const result = parseGoalInput(
+      { ...valid, source: "inv:cdb1" },
+      new Map([["cdb1", "CDB Banco X"]]),
+    );
+    expect(result.ok && [result.data.investment_id, result.data.investment_name]).toEqual([
+      "cdb1",
+      "CDB Banco X",
+    ]);
+  });
+
+  it("recusa investimento desconhecido", () => {
+    expect(parseGoalInput({ ...valid, source: "inv:x" }).ok).toBe(false);
   });
 
   it.each([
     ["sem nome", { name: " " }],
     ["valor zero", { target: "0" }],
     ["data inválida", { deadline: "2027-02-30" }],
-    ["sem conta", { accountId: "" }],
+    ["sem conta", { source: "" }],
   ])("recusa %s", (_label, change) => {
     expect(parseGoalInput({ ...valid, ...change }).ok).toBe(false);
   });

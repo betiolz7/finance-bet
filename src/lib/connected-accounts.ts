@@ -1,4 +1,4 @@
-import { addDays, isValidDate, todayInBrazil } from "./dates";
+import { isValidDate } from "./dates";
 import { parseMoneyToCents } from "./money";
 import type { PluggyAccount } from "./pluggy";
 
@@ -24,29 +24,25 @@ function dayOf(value?: string | null): number | null {
 }
 
 /**
- * Como a conta nasce com o saldo informado pelo banco, as transações só contam
- * a partir do dia seguinte à última atualização, para não contar duas vezes.
- * No cartão, busca desde o último fechamento, que é a fatura em aberto.
+ * O saldo exibido de uma conta conectada é o informado pelo banco, então dá
+ * para trazer o histórico do mês sem contar nada em dobro. No cartão, busca
+ * desde o último fechamento, que é a fatura em aberto.
  */
 export function planConnectedAccount(
   account: PluggyAccount,
-  itemLastUpdatedAt: string | null | undefined,
+  _itemLastUpdatedAt: string | null | undefined,
   today: string,
 ): ConnectedAccountPlan {
   const isCard = account.type === "CREDIT";
   const name = (account.marketingName || account.name || "Conta").trim();
-  const lastUpdated = itemLastUpdatedAt
-    ? todayInBrazil(new Date(itemLastUpdatedAt))
-    : null;
   const closeDate = account.creditData?.balanceCloseDate?.slice(0, 10);
+  const monthStart = `${today.slice(0, 7)}-01`;
 
   const importFrom = isCard
     ? closeDate && isValidDate(closeDate) && closeDate <= today
       ? closeDate
-      : `${today.slice(0, 7)}-01`
-    : lastUpdated && lastUpdated <= today
-      ? addDays(lastUpdated, 1)
-      : today;
+      : monthStart
+    : monthStart;
 
   const digits = account.number?.replace(/\D/g, "").slice(-4);
 
@@ -65,6 +61,18 @@ export function planConnectedAccount(
     p_last_digits: isCard && digits && digits.length === 4 ? digits : null,
     p_import_from: importFrom,
   };
+}
+
+/** Saldos informados pelo banco, em centavos, só das contas (não cartões). */
+export function bankBalances(
+  accounts: PluggyAccount[],
+): { pluggy_account_id: string; balance_cents: number }[] {
+  return accounts
+    .filter((account) => account.type !== "CREDIT" && typeof account.balance === "number")
+    .map((account) => ({
+      pluggy_account_id: account.id,
+      balance_cents: parseMoneyToCents(account.balance as number) ?? 0,
+    }));
 }
 
 /** Contas antes de cartões: o cartão precisa de uma conta para a fatura. */

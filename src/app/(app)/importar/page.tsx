@@ -1,6 +1,7 @@
 import { ConfirmButton } from "@/components/forms";
 import { Card, EmptyState, PageHeader, textButtonClass } from "@/components/ui";
 import { formatDate, todayInBrazil } from "@/lib/dates";
+import type { CategoryRule } from "@/lib/category-rules";
 import type { ExpenseHistoryItem } from "@/lib/import";
 import { formatCents } from "@/lib/money";
 import { requireDb } from "@/lib/supabase/server";
@@ -19,7 +20,7 @@ interface ImportBatch {
 
 export default async function ImportPage() {
   const db = await requireDb();
-  const [options, cards, history, batches] = await Promise.all([
+  const [options, cards, history, batches, rules] = await Promise.all([
     loadFormOptions(),
     loadActiveCards(),
     // As sugestões e o aviso de duplicada usam os gastos mais recentes.
@@ -37,8 +38,10 @@ export default async function ImportPage() {
       )
       .order("created_at", { ascending: false })
       .limit(20),
+    db.from("category_rules").select("pattern, category_id"),
   ]);
   if (history.error) throw new Error(history.error.message);
+  if (rules.error) throw new Error(rules.error.message);
   if (batches.error) throw new Error(batches.error.message);
 
   const { accounts, categories } = options;
@@ -56,6 +59,7 @@ export default async function ImportPage() {
           categories={categories}
           cards={cards}
           history={history.data as ExpenseHistoryItem[]}
+          rules={rules.data as CategoryRule[]}
           today={todayInBrazil()}
         />
       ) : (

@@ -7,6 +7,7 @@ import {
   secondaryButtonClass,
   textButtonClass,
 } from "@/components/ui";
+import { formatDate, todayInBrazil } from "@/lib/dates";
 import { formatCents } from "@/lib/money";
 import { requireDb } from "@/lib/supabase/server";
 import { ACCOUNT_KINDS } from "./account-fields";
@@ -18,6 +19,8 @@ interface AccountRow extends Institution {
   kind: string;
   archived: boolean;
   balance_cents: number;
+  ledger_balance_cents: number;
+  bank_balance_at: string | null;
   connected: boolean;
 }
 
@@ -26,7 +29,9 @@ export default async function AccountsPage() {
   const [balances, details, links] = await Promise.all([
     db
       .from("account_balances")
-      .select("id, name, kind, archived, balance_cents")
+      .select(
+        "id, name, kind, archived, balance_cents, ledger_balance_cents, bank_balance_at",
+      )
       .order("name"),
     db
       .from("accounts")
@@ -135,9 +140,21 @@ function AccountItem({ row }: { row: AccountRow }) {
           </p>
         </div>
       </div>
-      <p className="whitespace-nowrap text-sm font-semibold tabular-nums">
-        {formatCents(row.balance_cents)}
-      </p>
+      <div className="text-right">
+        <p className="whitespace-nowrap text-sm font-semibold tabular-nums">
+          {formatCents(row.balance_cents)}
+        </p>
+        {row.bank_balance_at && (
+          <p className="text-xs text-muted">
+            Saldo do banco em {formatDate(todayInBrazil(new Date(row.bank_balance_at)))}
+          </p>
+        )}
+        {row.bank_balance_at && row.ledger_balance_cents !== row.balance_cents && (
+          <p className="text-xs text-pending tabular-nums">
+            Lançamentos no app somam {formatCents(row.ledger_balance_cents)}
+          </p>
+        )}
+      </div>
       <div className="flex items-center gap-3">
         <Link href={`/contas/${row.id}/editar`} className={textButtonClass}>
           Editar

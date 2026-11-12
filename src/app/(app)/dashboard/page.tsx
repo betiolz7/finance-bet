@@ -9,6 +9,7 @@ import {
   Upload,
 } from "lucide-react";
 import Link from "next/link";
+import { Suspense } from "react";
 import { BankIcon, type Institution } from "@/components/bank-icon";
 import { BudgetStatus } from "@/components/budget-status";
 import { CreditCardVisual } from "@/components/credit-card-visual";
@@ -35,6 +36,7 @@ import {
   shiftMonth,
   todayInBrazil,
 } from "@/lib/dates";
+import { loadGoalBalances } from "@/lib/goal-balances-server";
 import { countGoalsByAccount, goalProgress } from "@/lib/goals";
 import { formatCents } from "@/lib/money";
 import { ensureRecurringGenerated } from "@/lib/recurring-server";
@@ -43,6 +45,7 @@ import { summarizeMonth } from "@/lib/transactions";
 import { setTransactionStatus } from "../lancamentos/actions";
 import { GoalMeter } from "../metas/goal-meter";
 import { Gauge } from "./gauge";
+import { NetWorthCard } from "./net-worth";
 import { ChartLegend, OverviewChart } from "./overview-chart";
 
 const UPCOMING_DAYS = 30;
@@ -149,7 +152,7 @@ export default async function DashboardPage({
       .lt("date", currentMonthEnd),
     db
       .from("goals")
-      .select("id, name, target_cents, deadline, account_id")
+      .select("id, name, target_cents, deadline, account_id, investment_id")
       .order("deadline"),
   ]);
   for (const result of results) {
@@ -230,7 +233,10 @@ export default async function DashboardPage({
       : null;
 
   const goals = goalsResult.data ?? [];
-  const balanceById = new Map(balances.map((row) => [row.id, row.balance_cents]));
+  // Metas ligadas a investimento precisam do saldo vindo da Pluggy.
+  const balanceById = goals.some((goal) => goal.investment_id)
+    ? (await loadGoalBalances(db, { withInvestments: true })).balances
+    : new Map(balances.map((row) => [row.id, row.balance_cents]));
   const goalCounts = countGoalsByAccount(goals);
   const firstCard = cards[0];
   const firstCardInvoices = firstCard
@@ -466,6 +472,17 @@ export default async function DashboardPage({
         </div>
 
         <div className="grid min-w-0 content-start gap-4 lg:grid-cols-2 2xl:grid-cols-1">
+          <Suspense
+            fallback={
+              <Card>
+                <p className="text-sm text-muted" role="status">
+                  Calculando patrimônio...
+                </p>
+              </Card>
+            }
+          >
+            <NetWorthCard />
+          </Suspense>
           <Card>
             <div className="mb-4 flex items-start justify-between gap-3">
               <div>

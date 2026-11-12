@@ -1,6 +1,6 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
-import { WEBHOOK_PATH } from "@/lib/webhook-path";
+import { EXTERNAL_PATHS } from "@/lib/webhook-path";
 import {
   isSupabaseConfigured,
   supabaseKey,
@@ -8,8 +8,8 @@ import {
 } from "@/lib/supabase/config";
 
 export async function proxy(request: NextRequest) {
-  // A Pluggy chama este endereço sem login; ele se protege pela senha própria.
-  if (request.nextUrl.pathname === WEBHOOK_PATH) return NextResponse.next();
+  // Pluggy e o agendador da Vercel chamam sem login; essas rotas têm senha própria.
+  if (EXTERNAL_PATHS.includes(request.nextUrl.pathname)) return NextResponse.next();
 
   const isLogin = request.nextUrl.pathname === "/login";
 
@@ -53,5 +53,8 @@ export async function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|webp|ico)$).*)"],
+  // Manifesto e ícones ficam fora do login: o celular os busca sem sessão para instalar o app.
+  matcher: [
+    "/((?!_next/static|_next/image|favicon.ico|manifest.webmanifest|icon|apple-icon|.*\\.(?:svg|png|webp|ico)$).*)",
+  ],
 };

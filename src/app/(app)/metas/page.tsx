@@ -2,6 +2,7 @@ import Link from "next/link";
 import { ActionForm, ConfirmButton, SubmitButton } from "@/components/forms";
 import { Card, EmptyState, PageHeader, textButtonClass } from "@/components/ui";
 import { todayInBrazil } from "@/lib/dates";
+import { loadGoalBalances } from "@/lib/goal-balances-server";
 import { countGoalsByAccount, goalProgress } from "@/lib/goals";
 import { requireDb } from "@/lib/supabase/server";
 import { loadFormOptions } from "../lancamentos/queries";
@@ -14,30 +15,28 @@ interface Goal {
   name: string;
   target_cents: number;
   deadline: string;
-  account_id: string;
-  account: { name: string };
+  account_id: string | null;
+  investment_id: string | null;
+  investment_name: string | null;
+  account: { name: string } | null;
 }
 
 export default async function GoalsPage() {
   const db = await requireDb();
-  const [goals, balances, options] = await Promise.all([
+  const [goals, options] = await Promise.all([
     db
       .from("goals")
-      .select("id, name, target_cents, deadline, account_id, account:accounts(name)")
+      .select(
+        "id, name, target_cents, deadline, account_id, investment_id, investment_name, account:accounts(name)",
+      )
       .order("deadline"),
-    db.from("account_balances").select("id, balance_cents"),
     loadFormOptions(),
   ]);
   if (goals.error) throw new Error(goals.error.message);
-  if (balances.error) throw new Error(balances.error.message);
 
   const rows = goals.data as unknown as Goal[];
-  const balanceById = new Map(
-    (balances.data as { id: string; balance_cents: number }[]).map((row) => [
-      row.id,
-      row.balance_cents,
-    ]),
-  );
+  // A lista de investimentos também serve para o formulário de nova meta.
+  const { balances, investments } = await loadGoalBalances(db, { withInvestments: true });
   const counts = countGoalsByAccount(rows);
   const today = todayInBrazil();
 
@@ -51,7 +50,7 @@ export default async function GoalsPage() {
         ) : (
           <ul className="divide-y divide-line">
             {rows.map((goal) => {
-              const progress = goalProgress(goal, balanceById, counts, today);
+              const progress = goalProgress(goal, balances, counts, today);
               return (
                 <li key={goal.id} className="py-4">
                   <GoalMeter
@@ -62,9 +61,11 @@ export default async function GoalsPage() {
                   />
                   <div className="mt-2 flex flex-wrap items-center justify-between gap-x-4 gap-y-1">
                     <p className="text-xs text-muted">
-                      {goal.account.name}
+                      {goal.investment_id
+                        ? `Investimento: ${goal.investment_name ?? "não encontrado"}`
+                        : goal.account?.name}
                       {progress.sharedAccount &&
-                        " · Esta conta é usada por outra meta, e o saldo conta nas duas."}
+                        " · Usado por outra meta, e o saldo conta nas duas."}
                     </p>
                     <div className="flex items-center gap-3">
                       <Link href={`/metas/${goal.id}/editar`} className={textButtonClass}>
@@ -90,21 +91,19 @@ export default async function GoalsPage() {
       <Card>
         <h2 className="mb-1 font-semibold">Nova meta</h2>
         <p className="mb-3 text-sm text-muted">
-          O progresso é o saldo da conta escolhida. Use uma conta separada para
-          cada meta, como uma poupança ou investimento.
+          O progresso é o saldo da conta ou do investimento escolhido. Um
+          investimento separado, como um CDB para a reserva, acompanha a meta
+          sozinho.
         </p>
-        {options.accounts.length === 0 ? (
+        {options.accounts.length === 0 && investments.length === 0 ? (
           <EmptyState
             message="Conecte seu banco antes de criar uma meta."
             href="/open-finance"
             linkLabel="Conectar banco"
           />
         ) : (
-          <ActionForm
-            action={createGoal}
-            className="grid items-end gap-4 sm:grid-cols-2"
-          >
-            <GoalFields accounts={options.accounts} />
+          <ActionForm action={createGoal} className="grid items-end gap-4 sm:grid-cols-2">
+            <GoalFields accounts={options.accounts} investments={investments} />
             <SubmitButton>Adicionar</SubmitButton>
           </ActionForm>
         )}

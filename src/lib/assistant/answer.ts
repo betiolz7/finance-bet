@@ -8,8 +8,11 @@ import {
   type BudgetRow,
 } from "../dashboard";
 import { addDays, formatDate, formatMonth, monthBounds, shiftMonth } from "../dates";
+import { loadGoalBalances } from "../goal-balances-server";
 import { countGoalsByAccount, goalProgress } from "../goals";
 import { normalizeName } from "../import";
+import { summarizePortfolio } from "../investments";
+import { loadInvestments } from "../investments-server";
 import { formatCents } from "../money";
 import { summarizeMonth } from "../transactions";
 import {
@@ -44,20 +47,48 @@ interface TxRow {
   date: string;
   description: string;
   category_id: string | null;
+  account_id: string | null;
+  card_id: string | null;
 }
 
 const MAX_ROWS = 8;
+const CARD_WORDS = new Set(["cartao", "cartoes", "credito", "cartao de credito"]);
 
 async function loadTransactions(db: SupabaseClient, period: Period): Promise<TxRow[]> {
   const { data, error } = await db
     .from("transactions")
-    .select("type, status, amount_cents, date, description, category_id")
+    .select(
+      "type, status, amount_cents, date, description, category_id, account_id, invoice:invoices(card_id)",
+    )
     .in("type", ["income", "expense"])
     .gte("date", period.start)
     .lt("date", period.end)
     .order("date", { ascending: false });
   if (error) throw new Error(error.message);
-  return data as TxRow[];
+  return (
+    data as unknown as (Omit<TxRow, "card_id"> & { invoice: { card_id: string } | null })[]
+  ).map(({ invoice, ...row }) => ({ ...row, card_id: invoice?.card_id ?? null }));
+}
+
+/** Conta ou cartão cujo nome, ou nome do banco, combina com o termo. */
+async function findSource(db: SupabaseClient, wanted: string) {
+  const [accounts, cards] = await Promise.all([
+    db.from("accounts").select("id, name, institution_name"),
+    db.from("credit_cards").select("id, name, institution_name"),
+  ]);
+  if (accounts.error) throw new Error(accounts.error.message);
+  if (cards.error) throw new Error(cards.error.message);
+  const matches = (row: { name: string; institution_name: string | null }) =>
+    [row.name, row.institution_name ?? ""].some((value) => {
+      const name = normalizeName(value);
+      return name.length >= 2 && (name.includes(wanted) || wanted.includes(name));
+    });
+  return {
+    accountIds: new Set((accounts.data ?? []).filter(matches).map((a) => a.id)),
+    cardIds: new Set((cards.data ?? []).filter(matches).map((c) => c.id)),
+    label:
+      [...(accounts.data ?? []), ...(cards.data ?? [])].find(matches)?.name ?? wanted,
+  };
 }
 
 async function loadCategories(db: SupabaseClient) {
@@ -97,18 +128,36 @@ async function answerParsed(
         loadCategories(db),
       ]);
       const wanted = normalizeName(term ?? "");
+      const expenses = rows.filter((row) => row.type === "expense");
       const category = categories.find(
         (c) => c.kind === "expense" && normalizeName(c.name) === wanted,
       );
-      const matches = rows.filter(
-        (row) =>
-          row.type === "expense" &&
-          (category
-            ? row.category_id === category.id
-            : normalizeName(row.description).includes(wanted)),
-      );
+      // Ordem: todos os cartões, categoria, conta ou cartão pelo nome, descrição.
+      const source =
+        CARD_WORDS.has(wanted) || category ? null : await findSource(db, wanted);
+      const bySource =
+        source && (source.accountIds.size > 0 || source.cardIds.size > 0) ? source : null;
+
+      let matches: TxRow[];
+      let target: string;
+      if (CARD_WORDS.has(wanted)) {
+        matches = expenses.filter((row) => row.card_id !== null);
+        target = "no cartão de crédito";
+      } else if (category) {
+        matches = expenses.filter((row) => row.category_id === category.id);
+        target = `na categoria ${category.name}`;
+      } else if (bySource) {
+        matches = expenses.filter(
+          (row) =>
+            (row.account_id && bySource.accountIds.has(row.account_id)) ||
+            (row.card_id && bySource.cardIds.has(row.card_id)),
+        );
+        target = `em ${bySource.label}`;
+      } else {
+        matches = expenses.filter((row) => normalizeName(row.description).includes(wanted));
+        target = `com "${term}"`;
+      }
       const total = matches.reduce((sum, row) => sum + row.amount_cents, 0);
-      const target = category ? `na categoria ${category.name}` : `com "${term}"`;
       return {
         title: `Gastos ${target}`,
         summary:
@@ -385,21 +434,21 @@ async function answerParsed(
     }
 
     case "goals": {
-      const [goals, balances] = await Promise.all([
-        db.from("goals").select("name, target_cents, deadline, account_id").order("deadline"),
-        db.from("account_balances").select("id, balance_cents"),
-      ]);
+      const goals = await db
+        .from("goals")
+        .select("name, target_cents, deadline, account_id, investment_id")
+        .order("deadline");
       if (goals.error) throw new Error(goals.error.message);
-      if (balances.error) throw new Error(balances.error.message);
       const goalRows = goals.data as {
         name: string;
         target_cents: number;
         deadline: string;
-        account_id: string;
+        account_id: string | null;
+        investment_id: string | null;
       }[];
-      const balanceById = new Map(
-        (balances.data as { id: string; balance_cents: number }[]).map((b) => [b.id, b.balance_cents]),
-      );
+      const { balances: balanceById } = await loadGoalBalances(db, {
+        withInvestments: goalRows.some((goal) => goal.investment_id),
+      });
       const counts = countGoalsByAccount(goalRows);
       return {
         title: "Suas metas",
@@ -455,6 +504,72 @@ async function answerParsed(
             cents: projection.projectedCents,
             tone: projection.projectedCents < 0 ? "warning" : "income",
           },
+        ],
+        link: { label: "Ver Dashboard", href: "/dashboard" },
+      };
+    }
+
+    case "investments": {
+      const { investments, totalCents, incomplete } = await loadInvestments(db);
+      const byType = summarizePortfolio(investments).byType;
+      return {
+        title: "Seus investimentos",
+        summary:
+          investments.length === 0
+            ? "Não encontrei investimentos nas conexões do Open Finance."
+            : `Você tem ${formatCents(totalCents)} investidos em ${plural(investments.length, "aplicação", "aplicações")}.${incomplete ? " Uma conexão não respondeu, então o total pode estar incompleto." : ""}`,
+        rows: byType.map((group) => ({
+          label: group.label,
+          detail: `${Math.round((group.cents / Math.max(1, totalCents)) * 100)}% da carteira`,
+          cents: group.cents,
+          tone: "neutral" as const,
+        })),
+        link: { label: "Ver investimentos", href: "/investimentos" },
+      };
+    }
+
+    case "net_worth": {
+      const [balances, investments] = await Promise.all([
+        db.from("account_balances").select("balance_cents").eq("archived", false),
+        loadInvestments(db),
+      ]);
+      if (balances.error) throw new Error(balances.error.message);
+      const accountsCents = (balances.data ?? []).reduce((sum, row) => sum + row.balance_cents, 0);
+      return {
+        title: "Seu patrimônio",
+        summary: `Somando contas e investimentos, você tem ${formatCents(accountsCents + investments.totalCents)}.`,
+        rows: [
+          { label: "Contas", cents: accountsCents, tone: "neutral" },
+          { label: "Investimentos", cents: investments.totalCents, tone: "neutral" },
+        ],
+        link: { label: "Ver Dashboard", href: "/dashboard" },
+      };
+    }
+
+    case "average": {
+      // Os últimos 3 meses completos, sem o mês atual, que ainda não terminou.
+      const current = today.slice(0, 7);
+      const range: Period = {
+        start: `${shiftMonth(current, -3)}-01`,
+        end: `${current}-01`,
+        label: "últimos 3 meses",
+      };
+      const rows = await loadTransactions(db, range);
+      const totals = summarizeMonth(rows);
+      const monthly = (cents: number) => Math.round(cents / 3);
+      const sofar = summarizeMonth(await loadTransactions(db, monthPeriod(current)));
+      return {
+        title: "Média mensal",
+        summary: `Nos últimos 3 meses, você gastou em média ${formatCents(monthly(totals.expenseCents))} por mês. Neste mês, até agora, foram ${formatCents(sofar.expenseCents)}.`,
+        rows: [
+          { label: "Receita média", cents: monthly(totals.incomeCents), tone: "income" },
+          { label: "Despesa média", cents: monthly(totals.expenseCents), tone: "expense" },
+          {
+            label: "Sobra média",
+            cents: monthly(totals.balanceCents),
+            tone: totals.balanceCents < 0 ? "warning" : "income",
+          },
+          { label: "Gasto neste mês até agora", cents: sofar.expenseCents, tone: "neutral" },
         ],
         link: { label: "Ver Dashboard", href: "/dashboard" },
       };

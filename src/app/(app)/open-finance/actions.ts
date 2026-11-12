@@ -8,6 +8,7 @@ import {
   ensureConnectedAccounts,
 } from "@/lib/connected-accounts-server";
 import { normalizeColor, safeLogoUrl } from "@/lib/connected-accounts";
+import { isValidDate } from "@/lib/dates";
 import {
   mapPluggyTransaction,
   parseReviewDecisions,
@@ -96,6 +97,23 @@ export async function setItemBank(
   if (error) return { error: describeDbError(error) };
 
   revalidatePath("/", "layout");
+  return {};
+}
+
+/** Desde quando trazer as transações de uma conta. O saldo vem do banco, então não conta em dobro. */
+export async function setImportFrom(
+  linkId: string,
+  _state: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  const db = await requireDb();
+  const date = String(formData.get("importFrom") ?? "");
+  if (!isValidDate(date)) return { error: "Informe uma data válida." };
+
+  const { error } = await db.from("bank_links").update({ import_from: date }).eq("id", linkId);
+  if (error) return { error: describeDbError(error) };
+
+  revalidatePath("/open-finance");
   return {};
 }
 

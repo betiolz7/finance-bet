@@ -1,18 +1,23 @@
 import { Field, inputClass } from "@/components/ui";
+import type { Investment } from "@/lib/investments";
+import { formatCents } from "@/lib/money";
 import type { Option } from "../lancamentos/transaction-form";
 
 export function GoalFields({
   accounts,
+  investments = [],
   name = "",
   target = "",
   deadline = "",
-  accountId,
+  source,
 }: {
   accounts: Option[];
+  investments?: Investment[];
   name?: string;
   target?: string;
   deadline?: string;
-  accountId?: string;
+  /** "acc:<id>" ou "inv:<id>". */
+  source?: string;
 }) {
   return (
     <>
@@ -38,13 +43,24 @@ export function GoalFields({
           className={inputClass}
         />
       </Field>
-      <Field label="Conta onde o dinheiro fica">
-        <select name="accountId" defaultValue={accountId} className={inputClass}>
-          {accounts.map((account) => (
-            <option key={account.id} value={account.id}>
-              {account.name}
-            </option>
-          ))}
+      <Field label="Onde o dinheiro fica">
+        <select name="source" required defaultValue={source} className={inputClass}>
+          <optgroup label="Contas">
+            {accounts.map((account) => (
+              <option key={account.id} value={`acc:${account.id}`}>
+                {account.name}
+              </option>
+            ))}
+          </optgroup>
+          {investments.length > 0 && (
+            <optgroup label="Investimentos">
+              {investments.map((investment) => (
+                <option key={investment.id} value={`inv:${investment.id}`}>
+                  {investment.name} ({formatCents(investment.balanceCents)})
+                </option>
+              ))}
+            </optgroup>
+          )}
         </select>
       </Field>
     </>

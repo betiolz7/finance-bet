@@ -2,7 +2,9 @@
 
 import { revalidatePath } from "next/cache";
 import type { ActionState } from "@/lib/action-state";
-import { todayInBrazil } from "@/lib/dates";
+import { shiftMonth, todayInBrazil } from "@/lib/dates";
+import { buildSummaryEmail } from "@/lib/monthly-summary";
+import { collectMonthlySummary } from "@/lib/monthly-summary-server";
 import {
   WEBHOOK_SECRET_HEADER,
   buildCreditEmail,
@@ -41,6 +43,20 @@ export async function activateNotifications(): Promise<ActionState> {
   }
 
   revalidatePath("/open-finance");
+  return {};
+}
+
+export async function sendMonthlySummaryNow(): Promise<ActionState> {
+  const db = await requireDb();
+  if (!isEmailConfigured()) return { error: "Configure o e-mail antes de enviar." };
+
+  const month = shiftMonth(todayInBrazil().slice(0, 7), -1);
+  try {
+    const summary = await collectMonthlySummary(db, month);
+    await sendEmail(buildSummaryEmail(summary, notificationsConfig().appUrl));
+  } catch {
+    return { error: "O resumo não foi enviado. Tente novamente." };
+  }
   return {};
 }
 

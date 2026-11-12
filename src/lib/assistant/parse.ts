@@ -17,6 +17,9 @@ export type Intent =
   | "goals"
   | "projection"
   | "income"
+  | "investments"
+  | "net_worth"
+  | "average"
   | "unknown";
 
 export interface Period {
@@ -119,6 +122,15 @@ export function parseQuestion(question: string, today: string): ParsedQuestion {
   const clean = rest.replace(FILLER, " ").replace(/\s+/g, " ").trim();
   const has = (pattern: RegExp) => pattern.test(clean);
 
+  if (has(/\b(patrimonio|quanto tenho no total|tudo que tenho)\b/)) {
+    return { intent: "net_worth", period };
+  }
+  if (has(/\b(investimento|investimentos|investido|investida|carteira|aplicacao|aplicacoes|aplicado)\b/)) {
+    return { intent: "investments", period };
+  }
+  if (has(/\b(media|medio|em media|por mes normalmente)\b/)) {
+    return { intent: "average", period };
+  }
   if (has(/\b(assinatura|assinaturas|recorrente|recorrentes|todo mes|todos os meses|custos? fixos?)\b/)) {
     return { intent: "recurring", period };
   }
@@ -173,4 +185,8 @@ export const SUGGESTIONS = [
   "Como estão minhas metas?",
   "Quanto vai sobrar no fim do mês?",
   "Quanto recebi este ano?",
+  "Quanto tenho investido?",
+  "Qual meu patrimônio?",
+  "Quanto gasto em média por mês?",
+  "Quanto gastei no cartão este mês?",
 ];

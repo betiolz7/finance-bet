@@ -10,6 +10,8 @@ describe("parseQuestion", () => {
     ["quanto gastei no mercado", "spent_on", "mercado"],
     ["Quanto paguei de uber em outubro?", "spent_on", "uber"],
     ["gastos com a farmácia nos últimos 30 dias", "spent_on", "farmacia"],
+    ["Quanto gastei no cartão este mês?", "spent_on", "cartao"],
+    ["quanto gastei no Nubank", "spent_on", "nubank"],
   ])("entende gasto com algo: %s", (question, intent, term) => {
     expect(parseQuestion(question, TODAY)).toMatchObject({ intent, term });
   });
@@ -26,6 +28,9 @@ describe("parseQuestion", () => {
     ["Como estão minhas metas?", "goals"],
     ["Quanto vai sobrar no fim do mês?", "projection"],
     ["Quanto recebi este ano?", "income"],
+    ["Quanto tenho investido?", "investments"],
+    ["Qual meu patrimônio?", "net_worth"],
+    ["Quanto gasto em média por mês?", "average"],
     ["bom dia", "unknown"],
   ])("reconhece o assunto: %s", (question, intent) => {
     expect(parseQuestion(question, TODAY).intent).toBe(intent);

@@ -1,19 +1,24 @@
 "use server";
 
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { describeDbError, type ActionState } from "@/lib/action-state";
 import { parseGoalInput } from "@/lib/goals";
+import { loadInvestments } from "@/lib/investments-server";
 import { requireDb } from "@/lib/supabase/server";
 
-function parseForm(formData: FormData) {
+async function parseForm(db: SupabaseClient, formData: FormData) {
   const read = (key: string) => String(formData.get(key) ?? "");
-  return parseGoalInput({
-    name: read("name"),
-    target: read("target"),
-    deadline: read("deadline"),
-    accountId: read("accountId"),
-  });
+  const source = read("source");
+  // O nome do investimento vem da Pluggy, não do formulário.
+  const names = source.startsWith("inv:")
+    ? new Map((await loadInvestments(db)).investments.map((i) => [i.id, i.name]))
+    : new Map<string, string>();
+  return parseGoalInput(
+    { name: read("name"), target: read("target"), deadline: read("deadline"), source },
+    names,
+  );
 }
 
 export async function createGoal(
@@ -21,7 +26,7 @@ export async function createGoal(
   formData: FormData,
 ): Promise<ActionState> {
   const db = await requireDb();
-  const parsed = parseForm(formData);
+  const parsed = await parseForm(db, formData);
   if (!parsed.ok) return { error: parsed.error };
 
   const { error } = await db.from("goals").insert(parsed.data);
@@ -37,7 +42,7 @@ export async function updateGoal(
   formData: FormData,
 ): Promise<ActionState> {
   const db = await requireDb();
-  const parsed = parseForm(formData);
+  const parsed = await parseForm(db, formData);
   if (!parsed.ok) return { error: parsed.error };
 
   const { error } = await db.from("goals").update(parsed.data).eq("id", id);

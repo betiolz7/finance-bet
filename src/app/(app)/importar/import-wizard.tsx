@@ -22,6 +22,7 @@ import {
   parseSheetRows,
   type ExpenseHistoryItem,
 } from "@/lib/import";
+import { categoryFromRules, type CategoryRule } from "@/lib/category-rules";
 import { formatCents } from "@/lib/money";
 import type { CategoryOption, Option } from "../lancamentos/transaction-form";
 import { confirmImport } from "./actions";
@@ -49,8 +50,10 @@ export function ImportWizard({
   categories,
   cards,
   history,
+  rules = [],
   today,
 }: {
+  rules?: CategoryRule[];
   accounts: Option[];
   categories: CategoryOption[];
   cards: Option[];
@@ -69,6 +72,11 @@ export function ImportWizard({
   const suggestions = useMemo(() => buildCategorySuggestions(history), [history]);
 
   function suggestCategory(name: string): string {
+    // Regra automática primeiro, depois a última categoria usada para o nome.
+    const fromRule = categoryFromRules(name, rules, (id) =>
+      expenseCategories.some((c) => c.id === id),
+    );
+    if (fromRule) return fromRule;
     const previous = suggestions.get(normalizeName(name));
     if (previous && expenseCategories.some((c) => c.id === previous)) {
       return previous;

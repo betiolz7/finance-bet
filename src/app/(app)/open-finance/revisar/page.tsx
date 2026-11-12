@@ -1,5 +1,6 @@
 import { Card, EmptyState, PageHeader, textButtonClass } from "@/components/ui";
 import { formatDate } from "@/lib/dates";
+import type { CategoryRule } from "@/lib/category-rules";
 import type { ExpenseHistoryItem } from "@/lib/import";
 import { formatCents } from "@/lib/money";
 import {
@@ -42,7 +43,7 @@ export default async function BankReviewPage({
   const select = `id, description, amount_cents, direction, date, pluggy_status, category,
     link:bank_links(account_id, card_id, account:accounts(name), card:credit_cards(name))`;
 
-  const [newRows, ignored, pending, history, options] = await Promise.all([
+  const [newRows, ignored, pending, history, options, rules] = await Promise.all([
     db
       .from("bank_transactions")
       .select(select)
@@ -69,8 +70,10 @@ export default async function BankReviewPage({
       .order("created_at", { ascending: false })
       .limit(1000),
     loadFormOptions(),
+    db.from("category_rules").select("pattern, category_id"),
   ]);
   if (newRows.error) throw new Error(newRows.error.message);
+  if (rules.error) throw new Error(rules.error.message);
   if (ignored.error) throw new Error(ignored.error.message);
   if (pending.error) throw new Error(pending.error.message);
   if (history.error) throw new Error(history.error.message);
@@ -92,6 +95,7 @@ export default async function BankReviewPage({
     pending: pending.data as PendingExpense[],
     paidHistory: history.data as ExpenseHistoryItem[],
     categories: options.categories,
+    rules: rules.data as CategoryRule[],
   });
   const ignoredRows = ignored.data as unknown as BankRow[];
 

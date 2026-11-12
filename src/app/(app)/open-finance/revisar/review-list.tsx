@@ -48,10 +48,17 @@ export function ReviewList({
     });
   }
 
-  const counts = { create: 0, match: 0, ignore: 0 };
+  const counts = { create: 0, match: 0, ignore: 0, transfer: 0 };
   for (const item of items) {
     const { choice } = decisions[item.id] ?? { choice: "ignore" };
-    counts[choice.startsWith("match:") ? "match" : (choice as "create" | "ignore")]++;
+    const kind = choice.startsWith("match:")
+      ? "match"
+      : choice.startsWith("transfer:")
+        ? "transfer"
+        : choice === "create"
+          ? "create"
+          : "ignore";
+    counts[kind]++;
   }
 
   return (
@@ -86,6 +93,11 @@ export function ReviewList({
                   {item.canCreate && (
                     <option value="create">
                       {item.kind === "income" ? "Lançar como receita" : "Lançar como despesa"}
+                    </option>
+                  )}
+                  {item.transferTo && (
+                    <option value={`transfer:${item.transferTo.id}`}>
+                      Transferência para {item.transferTo.accountName}
                     </option>
                   )}
                   {item.candidates.map((candidate) => (
@@ -127,7 +139,8 @@ export function ReviewList({
 
       <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-line pt-4">
         <p className="text-sm text-muted">
-          {counts.create} a lançar · {counts.match} a dar baixa · {counts.ignore} a ignorar
+          {counts.create} a lançar · {counts.transfer} transferências · {counts.match} a dar
+          baixa · {counts.ignore} a ignorar
         </p>
         <button
           type="button"

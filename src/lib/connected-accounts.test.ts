@@ -1,6 +1,7 @@
 import type { PGlite } from "@electric-sql/pglite";
 import { beforeEach, describe, expect, it } from "vitest";
 import {
+  bankBalances,
   normalizeColor,
   orderForCreation,
   planConnectedAccount,
@@ -33,23 +34,19 @@ const card: PluggyAccount = {
 };
 
 describe("planConnectedAccount", () => {
-  it("conta nasce com o saldo do banco e busca a partir do dia seguinte", () => {
+  it("conta nasce com o saldo do banco e traz o mês desde o primeiro dia", () => {
     expect(planConnectedAccount(bank, "2026-11-10T12:00:00.000Z", "2026-11-11")).toMatchObject({
       p_type: "BANK",
       p_name: "Conta Digital Inter",
       p_balance_cents: 123456,
-      p_import_from: "2026-11-11",
+      p_import_from: "2026-11-01",
     });
   });
 
-  it("usa a data do Brasil para a última atualização", () => {
-    expect(
-      planConnectedAccount(bank, "2026-11-11T01:30:00.000Z", "2026-11-11").p_import_from,
-    ).toBe("2026-11-11");
-  });
-
-  it("sem atualização conhecida, começa hoje", () => {
-    expect(planConnectedAccount(bank, null, "2026-11-11").p_import_from).toBe("2026-11-11");
+  it("separa o saldo informado só das contas, sem cartões", () => {
+    expect(bankBalances([bank, card, { ...bank, id: "sem-saldo", balance: null }])).toEqual([
+      { pluggy_account_id: "p-bank", balance_cents: 123456 },
+    ]);
   });
 
   it("cartão usa dias, limite e final do cartão vindos do banco", () => {
@@ -176,6 +173,17 @@ describe("funções do banco de dados", () => {
     const { rows } = await db.query("select item_id from bank_links");
     expect(rows).toEqual([{ item_id: "item-1" }]);
     expect((await db.query("select * from accounts")).rows).toHaveLength(1);
+  });
+
+  it("saldo exibido passa a ser o do banco, e o calculado continua disponível", async () => {
+    await connect(planConnectedAccount(bank, null, "2026-11-11"));
+    await db.exec(
+      `select public.set_bank_balances('[{"pluggy_account_id":"p-bank","balance_cents":50000}]')`,
+    );
+    const { rows } = await db.query(
+      "select balance_cents::int as shown, ledger_balance_cents::int as ledger from account_balances",
+    );
+    expect(rows).toEqual([{ shown: 50000, ledger: 123456 }]);
   });
 
   it("outro usuário não vê as contas criadas", async () => {

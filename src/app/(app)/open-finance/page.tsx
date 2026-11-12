@@ -22,7 +22,12 @@ import {
 } from "@/lib/pluggy";
 import { perItem } from "@/lib/per-item";
 import { requireDb } from "@/lib/supabase/server";
-import { refreshConnectedAccounts, setItemBank, syncBank } from "./actions";
+import {
+  refreshConnectedAccounts,
+  setImportFrom,
+  setItemBank,
+  syncBank,
+} from "./actions";
 import { ConnectBank } from "./connect-bank";
 import { NotificationsCard } from "./notifications-card";
 
@@ -42,7 +47,9 @@ interface StoredItem extends Institution {
 }
 
 interface LinkRow {
+  id: string;
   pluggy_account_id: string;
+  import_from: string;
   account: { name: string } | null;
   card: { name: string } | null;
 }
@@ -99,7 +106,9 @@ export default async function OpenFinancePage() {
       .select("item_id, connector_id, institution_name, institution_logo, institution_color"),
     db
       .from("bank_links")
-      .select("pluggy_account_id, account:accounts(name), card:credit_cards(name)"),
+      .select(
+        "id, pluggy_account_id, import_from, account:accounts(name), card:credit_cards(name)",
+      ),
     db
       .from("bank_transactions")
       .select("id", { count: "exact", head: true })
@@ -243,6 +252,25 @@ export default async function OpenFinancePage() {
                     >
                       {appName ? `✓ No app como ${appName}` : "● Ainda não importada"}
                     </span>
+                    {link && (
+                      <ActionForm
+                        action={setImportFrom.bind(null, link.id)}
+                        className="flex w-full flex-wrap items-center gap-2 text-xs"
+                      >
+                        <label htmlFor={`from-${link.id}`} className="text-muted">
+                          Buscar transações desde
+                        </label>
+                        <input
+                          id={`from-${link.id}`}
+                          name="importFrom"
+                          type="date"
+                          defaultValue={link.import_from}
+                          max={today}
+                          className="rounded-lg border border-line bg-surface px-2 py-1"
+                        />
+                        <SubmitButton className={textButtonClass}>Salvar</SubmitButton>
+                      </ActionForm>
+                    )}
                   </li>
                 );
               })}

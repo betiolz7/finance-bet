@@ -18,7 +18,15 @@ export default async function NewTransactionPage({
   return (
     <div className="max-w-xl">
       <PageHeader
-        title={tipo === "receita" ? "Nova receita" : tipo === "despesa" ? "Nova despesa" : "Novo lançamento"}
+        title={
+          tipo === "receita"
+            ? "Nova receita"
+            : tipo === "despesa"
+              ? "Nova despesa"
+              : tipo === "transferencia"
+                ? "Nova transferência"
+                : "Novo lançamento"
+        }
       />
       <Card>
         {accounts.length === 0 ? (
@@ -42,7 +50,8 @@ export default async function NewTransactionPage({
             submitLabel="Salvar lançamento"
             today={todayInBrazil()}
             initial={{
-              type: tipo === "receita" ? "income" : "expense",
+              type:
+                tipo === "receita" ? "income" : tipo === "transferencia" ? "transfer" : "expense",
               status: "paid",
               amount: "",
               date: todayInBrazil(),

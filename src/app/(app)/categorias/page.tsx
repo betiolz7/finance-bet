@@ -11,7 +11,9 @@ import { requireDb } from "@/lib/supabase/server";
 import {
   createCategory,
   createDefaultCategories,
+  createRule,
   deleteCategory,
+  deleteRule,
   updateCategory,
 } from "./actions";
 
@@ -24,12 +26,15 @@ interface Category {
 
 export default async function CategoriesPage() {
   const db = await requireDb();
-  const { data, error } = await db
-    .from("categories")
-    .select("id, name, kind, color")
-    .order("name");
-  if (error) throw new Error(error.message);
-  const rows = data as Category[];
+  const [categories, rulesResult] = await Promise.all([
+    db.from("categories").select("id, name, kind, color").order("name"),
+    db.from("category_rules").select("id, pattern, category_id").order("pattern"),
+  ]);
+  if (categories.error) throw new Error(categories.error.message);
+  if (rulesResult.error) throw new Error(rulesResult.error.message);
+  const rows = categories.data as Category[];
+  const rules = rulesResult.data as { id: string; pattern: string; category_id: string }[];
+  const byId = new Map(rows.map((row) => [row.id, row]));
 
   return (
     <>
@@ -77,6 +82,77 @@ export default async function CategoriesPage() {
             />
           </Field>
           <SubmitButton>Adicionar</SubmitButton>
+        </ActionForm>
+      </Card>
+
+      <Card className="mt-4">
+        <h2 className="mb-1 font-semibold">Regras automáticas</h2>
+        <p className="mb-3 text-sm text-muted">
+          Quando a descrição contém o texto, a categoria é sugerida sozinha na
+          revisão do banco e na importação de planilha. Maiúsculas e acentos não
+          importam.
+        </p>
+
+        {rules.length > 0 && (
+          <ul className="mb-4 divide-y divide-line">
+            {rules.map((rule) => {
+              const category = byId.get(rule.category_id);
+              return (
+                <li key={rule.id} className="flex flex-wrap items-center justify-between gap-3 py-2">
+                  <p className="min-w-0 text-sm">
+                    Contém <span className="font-semibold">&quot;{rule.pattern}&quot;</span>{" "}
+                    <span className="text-muted">→</span>{" "}
+                    <span className="inline-flex items-center gap-1.5">
+                      <span
+                        className="size-2.5 rounded-full"
+                        style={{ background: category?.color }}
+                        aria-hidden
+                      />
+                      {category?.name ?? "Categoria removida"}
+                    </span>
+                  </p>
+                  <form action={deleteRule.bind(null, rule.id)}>
+                    <ConfirmButton
+                      message={`Apagar a regra "${rule.pattern}"?`}
+                      className={textButtonClass}
+                    >
+                      Apagar
+                    </ConfirmButton>
+                  </form>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+
+        <ActionForm action={createRule} className="grid items-end gap-4 sm:grid-cols-[1fr_14rem_auto]">
+          <Field label="Se a descrição contém">
+            <input name="pattern" required placeholder="Ex.: uber" className={inputClass} />
+          </Field>
+          <Field label="Usar a categoria">
+            <select name="categoryId" required defaultValue="" className={inputClass}>
+              <option value="">Selecione</option>
+              <optgroup label="Despesas">
+                {rows
+                  .filter((row) => row.kind === "expense")
+                  .map((row) => (
+                    <option key={row.id} value={row.id}>
+                      {row.name}
+                    </option>
+                  ))}
+              </optgroup>
+              <optgroup label="Receitas">
+                {rows
+                  .filter((row) => row.kind === "income")
+                  .map((row) => (
+                    <option key={row.id} value={row.id}>
+                      {row.name}
+                    </option>
+                  ))}
+              </optgroup>
+            </select>
+          </Field>
+          <SubmitButton>Criar regra</SubmitButton>
         </ActionForm>
       </Card>
     </>

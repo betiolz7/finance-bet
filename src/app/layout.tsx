@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
 import { THEME_STORAGE_KEY } from "@/components/theme-toggle";
 import "./globals.css";
@@ -11,6 +11,16 @@ const inter = Inter({
 export const metadata: Metadata = {
   title: "finance-bet",
   description: "Controle financeiro pessoal",
+  appleWebApp: { capable: true, title: "finance-bet", statusBarStyle: "default" },
+};
+
+// Cor da barra do sistema quando o app está instalado, nos dois temas.
+export const viewport: Viewport = {
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#f4f4f2" },
+    { media: "(prefers-color-scheme: dark)", color: "#0e0e0d" },
+  ],
+  viewportFit: "cover",
 };
 
 // Aplica o tema salvo antes de a página aparecer, para não piscar no tema errado.

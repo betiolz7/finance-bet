@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { ActionForm, SubmitButton } from "@/components/forms";
 import { Card, PageHeader } from "@/components/ui";
+import { loadInvestments } from "@/lib/investments-server";
 import { centsToInput } from "@/lib/money";
 import { requireDb } from "@/lib/supabase/server";
 import { loadFormOptions } from "../../../lancamentos/queries";
@@ -16,12 +17,15 @@ export default async function EditGoalPage({
   const db = await requireDb();
   const { data } = await db
     .from("goals")
-    .select("name, target_cents, deadline, account_id")
+    .select("name, target_cents, deadline, account_id, investment_id")
     .eq("id", id)
     .maybeSingle();
   if (!data) notFound();
 
-  const { accounts } = await loadFormOptions([data.account_id]);
+  const [{ accounts }, { investments }] = await Promise.all([
+    loadFormOptions(data.account_id ? [data.account_id] : []),
+    loadInvestments(db),
+  ]);
 
   return (
     <div className="max-w-xl">
@@ -30,10 +34,11 @@ export default async function EditGoalPage({
         <ActionForm action={updateGoal.bind(null, id)} className="space-y-4">
           <GoalFields
             accounts={accounts}
+            investments={investments}
             name={data.name}
             target={centsToInput(data.target_cents)}
             deadline={data.deadline}
-            accountId={data.account_id}
+            source={data.investment_id ? `inv:${data.investment_id}` : `acc:${data.account_id}`}
           />
           <SubmitButton>Salvar alterações</SubmitButton>
         </ActionForm>

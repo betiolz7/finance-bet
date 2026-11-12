@@ -1,5 +1,9 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { orderForCreation, planConnectedAccount } from "./connected-accounts";
+import {
+  bankBalances,
+  orderForCreation,
+  planConnectedAccount,
+} from "./connected-accounts";
 import { todayInBrazil } from "./dates";
 import { perItem } from "./per-item";
 import { getItem, listAccounts, pluggyItemIds } from "./pluggy";
@@ -40,6 +44,13 @@ export async function ensureConnectedAccounts(
     if (error) throw new Error(error.message);
     if (data === "created") created++;
     if (data === "skipped") skipped++;
+  }
+
+  // O saldo exibido das contas conectadas é sempre o do banco.
+  const balances = bankBalances(accounts);
+  if (balances.length > 0) {
+    const { error } = await db.rpc("set_bank_balances", { p_items: balances });
+    if (error) throw new Error(error.message);
   }
   return { created, skipped, failed: failed.length };
 }
