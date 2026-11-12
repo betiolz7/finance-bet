@@ -20,6 +20,7 @@ import {
   type PluggyConnector,
   type PluggyItem,
 } from "@/lib/pluggy";
+import { perItem } from "@/lib/per-item";
 import { requireDb } from "@/lib/supabase/server";
 import { refreshConnectedAccounts, setItemBank, syncBank } from "./actions";
 import { ConnectBank } from "./connect-bank";
@@ -47,15 +48,16 @@ interface LinkRow {
 }
 
 async function loadConnections(itemIds: string[]) {
-  try {
-    const [items, accounts] = await Promise.all([
-      Promise.all(itemIds.map(getItem)),
-      Promise.all(itemIds.map(listAccounts)),
-    ]);
-    return { items, accounts: accounts.flat(), failed: false };
-  } catch {
-    return { items: [] as PluggyItem[], accounts: [] as PluggyAccount[], failed: true };
-  }
+  const { results, failed } = await perItem(itemIds, async (itemId) => {
+    const [item, accounts] = await Promise.all([getItem(itemId), listAccounts(itemId)]);
+    return { item, accounts };
+  });
+  return {
+    items: results.map(({ value }) => value.item) as PluggyItem[],
+    accounts: results.flatMap(({ value }) => value.accounts) as PluggyAccount[],
+    failedCount: failed.length,
+    failed: itemIds.length > 0 && results.length === 0,
+  };
 }
 
 async function loadConnectors(): Promise<PluggyConnector[]> {
@@ -128,13 +130,25 @@ export default async function OpenFinancePage() {
         }
       />
 
-      {connections.failed && (
+      {connections.failed ? (
         <Card className="mb-4">
           <p role="alert" className="text-sm text-expense">
-            Não foi possível falar com a Pluggy. Confira as credenciais no arquivo
-            .env.local.
+            Não foi possível falar com a Pluggy. Confira as credenciais e tente de
+            novo mais tarde.
           </p>
         </Card>
+      ) : (
+        connections.failedCount > 0 && (
+          <Card className="mb-4">
+            <p role="alert" className="text-sm text-expense">
+              {connections.failedCount === 1
+                ? "Uma conexão não respondeu."
+                : `${connections.failedCount} conexões não responderam.`}{" "}
+              Ela pode ter sido removida no Meu Pluggy ou estar com a autorização
+              vencida. As demais continuam funcionando.
+            </p>
+          </Card>
+        )
       )}
 
       <Card className="mb-4">

@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 import { Card, PageHeader } from "@/components/ui";
+import { todayInBrazil } from "@/lib/dates";
 import { centsToInput } from "@/lib/money";
 import { requireDb } from "@/lib/supabase/server";
 import type { TransactionRow } from "@/lib/transactions";
@@ -35,6 +36,7 @@ export default async function EditTransactionPage({
           accounts={accounts}
           categories={categories}
           submitLabel="Salvar alterações"
+          today={todayInBrazil()}
           initial={{
             type: row.type,
             status: row.status,

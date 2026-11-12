@@ -262,6 +262,14 @@ export function cardTextColor(background: string): "#ffffff" | "#141414" {
     : "#141414";
 }
 
+/** Cor sólida do banco reconhecido pelo nome, ou null se não reconhecer. */
+export function brandColor(name: string): string | null {
+  const preset = detectCardStyle(name);
+  if (preset) return CARD_PRESETS[preset].base;
+  const normalized = normalizeName(name);
+  return BANK_COLORS.find(({ pattern }) => pattern.test(normalized))?.color ?? null;
+}
+
 export interface ResolvedCardStyle {
   background: string;
   text: "#ffffff" | "#141414";

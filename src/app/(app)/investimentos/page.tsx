@@ -9,6 +9,7 @@ import {
 } from "@/lib/investments";
 import { formatCents } from "@/lib/money";
 import { isPluggyConfigured, listInvestments, pluggyItemIds } from "@/lib/pluggy";
+import { perItem } from "@/lib/per-item";
 import { requireDb } from "@/lib/supabase/server";
 
 function formatMoney(cents: number, currency: string): string {
@@ -44,13 +45,13 @@ export default async function InvestmentsPage() {
     ]),
   ];
 
-  let investments: Investment[] = [];
-  let failed = false;
-  try {
-    investments = mapInvestments((await Promise.all(itemIds.map(listInvestments))).flat());
-  } catch {
-    failed = true;
-  }
+  // Uma conexão com problema não esconde os investimentos das outras.
+  const fetched = await perItem(itemIds, listInvestments);
+  const investments: Investment[] = mapInvestments(
+    fetched.results.flatMap(({ value }) => value),
+  );
+  const failed = itemIds.length > 0 && fetched.results.length === 0;
+  const partial = !failed && fetched.failed.length > 0;
 
   const summary = summarizePortfolio(investments);
   const brl = investments.filter((item) => item.currencyCode === "BRL");
@@ -64,6 +65,15 @@ export default async function InvestmentsPage() {
           <p role="alert" className="text-sm text-expense">
             Não foi possível buscar os investimentos na Pluggy. Tente novamente mais
             tarde.
+          </p>
+        </Card>
+      )}
+
+      {partial && (
+        <Card className="mb-4">
+          <p role="alert" className="text-sm text-expense">
+            Uma ou mais conexões não responderam, então o total pode estar
+            incompleto.
           </p>
         </Card>
       )}

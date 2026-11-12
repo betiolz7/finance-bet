@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { describeDbError, type ActionState } from "@/lib/action-state";
+import { institutionFromForm } from "@/lib/institution-server";
 import { parseMoneyToCents } from "@/lib/money";
 import { requireDb } from "@/lib/supabase/server";
 
@@ -29,7 +30,13 @@ export async function updateAccount(
   const parsed = parseForm(formData);
   if (!parsed.data) return { error: parsed.error };
 
-  const { error } = await db.from("accounts").update(parsed.data).eq("id", id);
+  const institution = await institutionFromForm(formData);
+  if (institution.error) return { error: institution.error };
+
+  const { error } = await db
+    .from("accounts")
+    .update({ ...parsed.data, ...institution.fields })
+    .eq("id", id);
   if (error) return { error: describeDbError(error) };
 
   revalidatePath("/", "layout");

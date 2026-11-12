@@ -74,7 +74,7 @@ export function Sidebar({
           href={item.href}
           title={collapsed ? item.label : undefined}
           aria-current={active ? "page" : undefined}
-          className={`relative flex items-center gap-3 rounded-xl px-3 py-2.5 text-[15px] ${
+          className={`relative flex items-center gap-3 rounded-xl px-3 py-2 text-[15px] ${
             active ? "bg-soft font-medium text-ink" : "text-ink/80 hover:bg-soft/60"
           } ${collapsed ? "justify-center" : ""}`}
         >
@@ -94,7 +94,7 @@ export function Sidebar({
                   <Link
                     href={child.href}
                     aria-current={childActive ? "page" : undefined}
-                    className={`flex items-center gap-2 rounded-lg px-2 py-1.5 text-sm ${
+                    className={`flex items-center gap-2 rounded-lg px-2 py-1 text-sm ${
                       childActive ? "bg-soft font-medium" : "text-ink/75 hover:text-ink"
                     }`}
                   >
@@ -122,14 +122,14 @@ export function Sidebar({
     >
       <Link
         href="/dashboard"
-        className={`mb-8 text-xl font-bold tracking-tight ${collapsed ? "text-center" : "px-3"}`}
+        className={`mb-6 text-xl font-bold tracking-tight ${collapsed ? "text-center" : "px-3"}`}
       >
         {collapsed ? "fb" : "finance-bet"}
       </Link>
 
-      <nav className="flex-1 overflow-y-auto" aria-label="Menu principal">
+      <nav className="no-scrollbar -mx-3 flex-1 overflow-y-auto px-3" aria-label="Menu principal">
         <ul className="space-y-1">{MAIN_NAV.map(renderItem)}</ul>
-        <hr className="my-5 border-line" />
+        <hr className="my-3 border-line" />
         <ul className="space-y-1">{SECONDARY_NAV.map(renderItem)}</ul>
       </nav>
 

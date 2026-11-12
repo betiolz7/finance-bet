@@ -83,6 +83,14 @@ body {
   color: var(--color-ink);
 }
 
+/* Rola sem mostrar a barra de rolagem. */
+.no-scrollbar {
+  scrollbar-width: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
 /* Textura listrada das barras, como na referência. */
 .hatch {
   background-image: repeating-linear-gradient(

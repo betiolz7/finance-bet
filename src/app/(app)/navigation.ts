@@ -3,6 +3,7 @@ import {
   CreditCard,
   LayoutGrid,
   PiggyBank,
+  Sparkles,
   Tags,
   Target,
   TrendingUp,
@@ -19,6 +20,7 @@ export interface NavItem {
 
 export const MAIN_NAV: NavItem[] = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutGrid },
+  { href: "/assistente", label: "Assistente", icon: Sparkles },
   {
     href: "/lancamentos",
     label: "Lançamentos",

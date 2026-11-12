@@ -4,7 +4,12 @@ import { createTransaction } from "../actions";
 import { loadActiveCards, loadFormOptions } from "../queries";
 import { TransactionForm } from "../transaction-form";
 
-export default async function NewTransactionPage() {
+export default async function NewTransactionPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ tipo?: string }>;
+}) {
+  const { tipo } = await searchParams;
   const [{ accounts, categories }, cards] = await Promise.all([
     loadFormOptions(),
     loadActiveCards(),
@@ -12,7 +17,9 @@ export default async function NewTransactionPage() {
 
   return (
     <div className="max-w-xl">
-      <PageHeader title="Novo lançamento" />
+      <PageHeader
+        title={tipo === "receita" ? "Nova receita" : tipo === "despesa" ? "Nova despesa" : "Novo lançamento"}
+      />
       <Card>
         {accounts.length === 0 ? (
           <EmptyState
@@ -33,8 +40,9 @@ export default async function NewTransactionPage() {
             categories={categories}
             cards={cards}
             submitLabel="Salvar lançamento"
+            today={todayInBrazil()}
             initial={{
-              type: "expense",
+              type: tipo === "receita" ? "income" : "expense",
               status: "paid",
               amount: "",
               date: todayInBrazil(),

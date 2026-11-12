@@ -2,11 +2,23 @@ import Link from "next/link";
 import { formatMonth, shiftMonth } from "@/lib/dates";
 import { secondaryButtonClass } from "./ui";
 
-export function MonthNav({ basePath, month }: { basePath: string; month: string }) {
+/** Navegação entre meses. `query` mantém outros filtros da página ao trocar de mês. */
+export function MonthNav({
+  basePath,
+  month,
+  query = {},
+}: {
+  basePath: string;
+  month: string;
+  query?: Record<string, string>;
+}) {
+  const href = (target: string) =>
+    `${basePath}?${new URLSearchParams({ ...query, mes: target })}`;
+
   return (
     <div className="flex items-center gap-2">
       <Link
-        href={`${basePath}?mes=${shiftMonth(month, -1)}`}
+        href={href(shiftMonth(month, -1))}
         aria-label="Mês anterior"
         className={secondaryButtonClass}
       >
@@ -16,7 +28,7 @@ export function MonthNav({ basePath, month }: { basePath: string; month: string 
         {formatMonth(month)}
       </span>
       <Link
-        href={`${basePath}?mes=${shiftMonth(month, 1)}`}
+        href={href(shiftMonth(month, 1))}
         aria-label="Próximo mês"
         className={secondaryButtonClass}
       >

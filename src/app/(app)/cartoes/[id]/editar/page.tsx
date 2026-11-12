@@ -1,5 +1,7 @@
 import { notFound } from "next/navigation";
+import { BankSelect } from "@/components/bank-select";
 import { ActionForm, SubmitButton } from "@/components/forms";
+import { loadBankOptions } from "@/lib/institution-server";
 import { Card, PageHeader } from "@/components/ui";
 import { centsToInput } from "@/lib/money";
 import { requireDb } from "@/lib/supabase/server";
@@ -14,11 +16,16 @@ export default async function EditCardPage({
 }) {
   const { id } = await params;
   const db = await requireDb();
-  const { data } = await db
-    .from("credit_cards")
-    .select("name, limit_cents, closing_day, due_day, payment_account_id, color, style, last_digits")
-    .eq("id", id)
-    .maybeSingle();
+  const [{ data }, connectors] = await Promise.all([
+    db
+      .from("credit_cards")
+      .select(
+        "name, limit_cents, closing_day, due_day, payment_account_id, color, style, last_digits, institution_name",
+      )
+      .eq("id", id)
+      .maybeSingle(),
+    loadBankOptions(),
+  ]);
   if (!data) notFound();
 
   const { accounts } = await loadFormOptions([data.payment_account_id]);
@@ -39,6 +46,7 @@ export default async function EditCardPage({
             style={data.style ?? ""}
             lastDigits={data.last_digits ?? ""}
           />
+          <BankSelect connectors={connectors} current={data.institution_name} />
           <p className="text-sm text-muted">
             Mudar os dias de fechamento ou vencimento vale apenas para faturas
             novas.

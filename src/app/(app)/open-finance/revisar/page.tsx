@@ -29,7 +29,13 @@ interface BankRow {
   };
 }
 
-export default async function BankReviewPage() {
+export default async function BankReviewPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ falhas?: string }>;
+}) {
+  const { falhas } = await searchParams;
+  const failedAccounts = Math.max(0, Number(falhas) || 0);
   const db = await requireDb();
   await ensureRecurringGenerated();
 
@@ -92,6 +98,16 @@ export default async function BankReviewPage() {
   return (
     <>
       <PageHeader title="Revisar transações do banco" />
+      {failedAccounts > 0 && (
+        <Card className="mb-4">
+          <p role="alert" className="text-sm text-expense">
+            {failedAccounts === 1
+              ? "Uma conta não respondeu na busca."
+              : `${failedAccounts} contas não responderam na busca.`}{" "}
+            As transações delas ficam para a próxima busca.
+          </p>
+        </Card>
+      )}
       <Card className="mb-4">
         {items.length === 0 ? (
           <EmptyState

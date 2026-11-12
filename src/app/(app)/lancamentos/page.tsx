@@ -48,10 +48,11 @@ const AMOUNT_STYLE: Record<ListedType, { sign: string; className: string }> = {
 export default async function TransactionsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ mes?: string; busca?: string }>;
+  searchParams: Promise<{ mes?: string; busca?: string; tipo?: string }>;
 }) {
-  const { mes, busca } = await searchParams;
+  const { mes, busca, tipo } = await searchParams;
   const search = busca?.trim().slice(0, 100) ?? "";
+  const tab: Tab = tipo === "receitas" || tipo === "despesas" ? tipo : "todos";
   const db = await requireDb();
   await ensureRecurringGenerated();
 
@@ -79,8 +80,24 @@ export default async function TransactionsPage({
   const { data, error } = await query;
   if (error) throw new Error(error.message);
 
-  const rows = data as unknown as ListedTransaction[];
-  const summary = summarizeMonth(rows);
+  const allRows = data as unknown as ListedTransaction[];
+  const summary = summarizeMonth(allRows);
+  const incomeRows = allRows.filter((row) => row.type === "income");
+  const expenseRows = allRows.filter((row) => row.type === "expense");
+  const rows =
+    tab === "receitas" ? incomeRows : tab === "despesas" ? expenseRows : allRows;
+
+  // Filtros que a troca de aba e de mês precisam manter.
+  const keep: Record<string, string> = search ? { busca: search } : { mes: month };
+  const tabHref = (target: Tab) =>
+    `/lancamentos?${new URLSearchParams(target === "todos" ? keep : { ...keep, tipo: target })}`;
+  const emptyMessage = search
+    ? "Nada encontrado."
+    : tab === "receitas"
+      ? "Nenhuma receita neste mês."
+      : tab === "despesas"
+        ? "Nenhuma despesa neste mês."
+        : "Nenhum lançamento neste mês.";
 
   return (
     <>
@@ -92,22 +109,78 @@ export default async function TransactionsPage({
               Limpar busca
             </Link>
           ) : (
-            <MonthNav basePath="/lancamentos" month={month} />
+            <MonthNav
+              basePath="/lancamentos"
+              month={month}
+              query={tab === "todos" ? {} : { tipo: tab }}
+            />
           )
         }
       />
 
       <div className="mb-4 grid gap-3 sm:grid-cols-3">
-        <Summary label="Receitas" value={summary.incomeCents} />
-        <Summary label="Despesas" value={summary.expenseCents} />
-        <Summary label="Sobra do mês" value={summary.balanceCents} />
+        <Summary
+          label="Receitas"
+          value={summary.incomeCents}
+          href={tabHref("receitas")}
+          active={tab === "receitas"}
+          tone="text-income"
+        />
+        <Summary
+          label="Despesas"
+          value={summary.expenseCents}
+          href={tabHref("despesas")}
+          active={tab === "despesas"}
+          tone="text-expense"
+        />
+        <Summary
+          label={search ? "Saldo da busca" : "Sobra do mês"}
+          value={summary.balanceCents}
+          href={tabHref("todos")}
+          active={tab === "todos"}
+        />
+      </div>
+
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+        <nav aria-label="Tipo de lançamento" className="flex gap-1 rounded-xl bg-surface p-1">
+          {(
+            [
+              ["todos", "Todos", allRows.length],
+              ["receitas", "Receitas", incomeRows.length],
+              ["despesas", "Despesas", expenseRows.length],
+            ] as const
+          ).map(([value, label, count]) => (
+            <Link
+              key={value}
+              href={tabHref(value)}
+              aria-current={tab === value ? "page" : undefined}
+              className={`rounded-lg px-3 py-1.5 text-sm ${
+                tab === value ? "bg-ink font-medium text-on-ink" : "text-muted hover:text-ink"
+              }`}
+            >
+              {label} <span className="tabular-nums opacity-70">{count}</span>
+            </Link>
+          ))}
+        </nav>
+        {tab !== "todos" && (
+          <Link
+            href={`/lancamentos/novo?tipo=${tab === "receitas" ? "receita" : "despesa"}`}
+            className={textButtonClass}
+          >
+            + Nova {tab === "receitas" ? "receita" : "despesa"}
+          </Link>
+        )}
       </div>
 
       <Card>
         {rows.length === 0 ? (
           <EmptyState
-            message={search ? "Nada encontrado." : "Nenhum lançamento neste mês."}
-            href="/lancamentos/novo"
+            message={emptyMessage}
+            href={
+              tab === "receitas"
+                ? "/lancamentos/novo?tipo=receita"
+                : "/lancamentos/novo"
+            }
             linkLabel="Criar lançamento"
           />
         ) : (
@@ -122,14 +195,34 @@ export default async function TransactionsPage({
   );
 }
 
-function Summary({ label, value }: { label: string; value: number }) {
+type Tab = "todos" | "receitas" | "despesas";
+
+function Summary({
+  label,
+  value,
+  href,
+  active,
+  tone = "",
+}: {
+  label: string;
+  value: number;
+  href: string;
+  active: boolean;
+  tone?: string;
+}) {
   return (
-    <Card>
+    <Link
+      href={href}
+      aria-current={active ? "true" : undefined}
+      className={`block rounded-[20px] bg-surface p-5 transition md:p-6 ${
+        active ? "ring-2 ring-ink" : "hover:bg-soft"
+      }`}
+    >
       <p className="text-sm text-muted">{label}</p>
-      <p className="mt-1 text-2xl font-semibold tracking-tight tabular-nums">
+      <p className={`mt-1 whitespace-nowrap text-2xl font-semibold tracking-tight tabular-nums ${tone}`}>
         {formatCents(value)}
       </p>
-    </Card>
+    </Link>
   );
 }
 

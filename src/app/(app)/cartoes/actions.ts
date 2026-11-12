@@ -4,6 +4,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { describeDbError, type ActionState } from "@/lib/action-state";
+import { institutionFromForm } from "@/lib/institution-server";
 import { parseCardInput } from "@/lib/cards";
 import { isValidDate } from "@/lib/dates";
 import { parseMoneyToCents } from "@/lib/money";
@@ -34,7 +35,13 @@ export async function updateCard(
   const parsed = parseCardForm(formData);
   if (!parsed.ok) return { error: parsed.error };
 
-  const { error } = await db.from("credit_cards").update(parsed.data).eq("id", id);
+  const institution = await institutionFromForm(formData);
+  if (institution.error) return { error: institution.error };
+
+  const { error } = await db
+    .from("credit_cards")
+    .update({ ...parsed.data, ...institution.fields })
+    .eq("id", id);
   if (error) return { error: describeDbError(error) };
 
   revalidatePath("/", "layout");

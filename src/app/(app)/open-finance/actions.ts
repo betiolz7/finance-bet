@@ -117,25 +117,33 @@ export async function syncBank(): Promise<ActionState> {
     return { error: "Nenhuma conta conectada ainda." };
   }
 
-  try {
-    for (const link of links) {
-      const rows = (await listTransactions(link.pluggy_account_id, link.import_from))
+  // Uma conta com problema não impede a busca das outras.
+  let failed = 0;
+  for (const link of links) {
+    let rows;
+    try {
+      rows = (await listTransactions(link.pluggy_account_id, link.import_from))
         .map(mapPluggyTransaction)
         .filter((row) => row !== null);
-
-      const { error: syncError } = await db.rpc("sync_bank_transactions", {
-        p_link_id: link.id,
-        p_from: link.import_from,
-        p_rows: rows,
-      });
-      if (syncError) return { error: describeDbError(syncError) };
+    } catch {
+      failed++;
+      continue;
     }
-  } catch {
+
+    const { error: syncError } = await db.rpc("sync_bank_transactions", {
+      p_link_id: link.id,
+      p_from: link.import_from,
+      p_rows: rows,
+    });
+    if (syncError) return { error: describeDbError(syncError) };
+  }
+
+  if (failed === links.length) {
     return { error: "Não foi possível falar com a Pluggy. Tente novamente." };
   }
 
   revalidatePath("/", "layout");
-  redirect("/open-finance/revisar");
+  redirect(`/open-finance/revisar${failed > 0 ? `?falhas=${failed}` : ""}`);
 }
 
 export async function applyReview(
