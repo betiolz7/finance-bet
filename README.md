@@ -13,6 +13,12 @@
 
 [**🌐 Ver online**](https://finance-bet-amber.vercel.app) · [Especificação](docs/especificacao-mvp.md)
 
+<br>
+
+<img src="docs/img/dashboard.png" width="900" alt="Dashboard com saldo, receitas, despesas, limite de gastos e previsão do mês">
+
+<sub>Telas com dados de exemplo (fictícios)</sub>
+
 </div>
 
 ---
@@ -39,11 +45,37 @@ O **finance-bet** é um app web para organizar a vida financeira de verdade, nã
 | 📤 **Exportar** | Exporta os lançamentos para Excel |
 | 🌗 **Tema claro e escuro** | E instalação como app no celular |
 
+## 📸 Telas
+
+<table>
+  <tr>
+    <td width="50%"><img src="docs/img/cartoes.png" alt="Cartões com fatura a pagar e limite disponível"></td>
+    <td width="50%"><img src="docs/img/lancamentos.png" alt="Lista de lançamentos do mês com filtros"></td>
+  </tr>
+  <tr>
+    <td align="center"><sub>Cartões, faturas e limite disponível</sub></td>
+    <td align="center"><sub>Lançamentos do mês, com custos fixos e parcelas</sub></td>
+  </tr>
+  <tr>
+    <td width="50%"><img src="docs/img/assistente.png" alt="Assistente respondendo quais foram os maiores gastos"></td>
+    <td width="50%"><img src="docs/img/orcamento.png" alt="Orçamento por categoria com alertas"></td>
+  </tr>
+  <tr>
+    <td align="center"><sub>Assistente que responde perguntas em português</sub></td>
+    <td align="center"><sub>Orçamento por categoria com alertas</sub></td>
+  </tr>
+</table>
+
+<p align="center">
+  <img src="docs/img/celular.png" width="260" alt="Dashboard no celular">
+  <br><sub>Feito para usar no celular</sub>
+</p>
+
 ## 🛠️ Stack
 
 - **Front e back:** Next.js 16 (App Router, Server Actions), React 19, TypeScript
 - **Estilo:** Tailwind CSS 4, ícones Lucide
-- **Banco e login:** Supabase (Postgres + Auth + RLS), com 10 migrations versionadas
+- **Banco e login:** Supabase (Postgres + Auth + RLS), com 13 migrations versionadas
 - **Open Finance:** Pluggy SDK + widget Pluggy Connect, com webhook assinado
 - **E-mail:** Resend
 - **Deploy:** Vercel, com Vercel Cron para o resumo mensal
