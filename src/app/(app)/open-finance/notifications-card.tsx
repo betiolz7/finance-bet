@@ -6,6 +6,8 @@ import {
   webhookUrl,
 } from "@/lib/notifications";
 import { listWebhooks } from "@/lib/pluggy";
+import { isOwnerEmail } from "@/lib/supabase/admin";
+import { requireUser } from "@/lib/supabase/server";
 import {
   activateNotifications,
   sendMonthlySummaryNow,
@@ -22,8 +24,11 @@ async function isActive(url: string | null): Promise<boolean | null> {
   }
 }
 
-/** Aviso por e-mail quando entra dinheiro numa conta conectada. */
+/** Aviso por e-mail quando entra dinheiro numa conta conectada. Só para o dono do app. */
 export async function NotificationsCard() {
+  const { email } = await requireUser();
+  if (!isOwnerEmail(email)) return null;
+
   const config = notificationsConfig();
   const emailReady = isEmailConfigured();
   const url = webhookUrl(config.appUrl);

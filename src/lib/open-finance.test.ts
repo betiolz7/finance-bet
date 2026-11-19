@@ -23,7 +23,6 @@ describe("cliente da Pluggy", () => {
     resetPluggyAuth();
     vi.stubEnv("PLUGGY_CLIENT_ID", "id");
     vi.stubEnv("PLUGGY_CLIENT_SECRET", "segredo");
-    vi.stubEnv("PLUGGY_ITEM_IDS", " a , b ");
   });
 
   afterEach(() => {
@@ -31,8 +30,7 @@ describe("cliente da Pluggy", () => {
     vi.unstubAllGlobals();
   });
 
-  it("exige as credenciais, mas não os IDs das conexões", () => {
-    vi.stubEnv("PLUGGY_ITEM_IDS", "");
+  it("exige as credenciais", () => {
     expect(isPluggyConfigured()).toBe(true);
     vi.stubEnv("PLUGGY_CLIENT_SECRET", "");
     expect(isPluggyConfigured()).toBe(false);

@@ -1,4 +1,5 @@
 import { Field, inputClass } from "@/components/ui";
+import type { RecurringType } from "@/lib/recurring";
 import type { CategoryOption, Option } from "../lancamentos/transaction-form";
 
 export interface RecurringFormValues {
@@ -10,16 +11,19 @@ export interface RecurringFormValues {
 }
 
 export function RecurringFields({
+  type,
   accounts,
   categories,
   initial,
 }: {
+  type: RecurringType;
   accounts: Option[];
   categories: CategoryOption[];
   initial: RecurringFormValues;
 }) {
   return (
     <>
+      <input type="hidden" name="type" value={type} />
       <Field label="Descrição">
         <input
           name="description"
@@ -41,7 +45,7 @@ export function RecurringFields({
             className={inputClass}
           />
         </Field>
-        <Field label="Dia do vencimento">
+        <Field label={type === "income" ? "Dia do recebimento" : "Dia do vencimento"}>
           <input
             name="dueDay"
             type="number"
@@ -64,7 +68,7 @@ export function RecurringFields({
           >
             <option value="">Selecione</option>
             {categories
-              .filter((category) => category.kind === "expense")
+              .filter((category) => category.kind === type)
               .map((category) => (
                 <option key={category.id} value={category.id}>
                   {category.name}

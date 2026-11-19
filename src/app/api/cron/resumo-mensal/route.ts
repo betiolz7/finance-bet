@@ -1,10 +1,9 @@
-import { createClient } from "@supabase/supabase-js";
 import { timingSafeEqual } from "node:crypto";
 import { shiftMonth, todayInBrazil } from "@/lib/dates";
 import { buildSummaryEmail } from "@/lib/monthly-summary";
 import { collectMonthlySummary } from "@/lib/monthly-summary-server";
 import { isEmailConfigured, notificationsConfig, sendEmail } from "@/lib/notifications";
-import { supabaseUrl } from "@/lib/supabase/config";
+import { createAdminClient, findUserIdByEmail, ownerEmail } from "@/lib/supabase/admin";
 
 function authorized(header: string | null): boolean {
   const secret = process.env.CRON_SECRET;
@@ -16,26 +15,24 @@ function authorized(header: string | null): boolean {
 
 /**
  * Chamado pelo agendador da Vercel no dia 1º, sem usuário logado. Por isso usa
- * a chave de serviço do Supabase, que fica só no servidor. O app tem um único
- * usuário; com vários, seria preciso separar os dados por usuário aqui.
+ * a chave de serviço do Supabase, que enxerga todos os usuários. O resumo é só
+ * do dono do app (NOTIFY_EMAIL_TO), filtrado pelo id dele.
  */
 export async function GET(request: Request) {
   if (!authorized(request.headers.get("authorization"))) {
     return new Response(null, { status: 401 });
   }
 
-  const serviceKey = process.env.SUPABASE_SECRET_KEY;
-  if (!serviceKey || !supabaseUrl || !isEmailConfigured()) {
+  const db = createAdminClient();
+  if (!db || !isEmailConfigured()) {
     return new Response("Resumo mensal não configurado.", { status: 503 });
   }
-
-  const db = createClient(supabaseUrl, serviceKey, {
-    auth: { persistSession: false, autoRefreshToken: false },
-  });
   const month = shiftMonth(todayInBrazil().slice(0, 7), -1);
 
   try {
-    const summary = await collectMonthlySummary(db, month);
+    const ownerId = await findUserIdByEmail(db, ownerEmail());
+    if (!ownerId) return new Response("Dono do app não encontrado.", { status: 503 });
+    const summary = await collectMonthlySummary(db, month, ownerId);
     await sendEmail(buildSummaryEmail(summary, notificationsConfig().appUrl));
   } catch (error) {
     console.error("Falha no resumo mensal:", error);

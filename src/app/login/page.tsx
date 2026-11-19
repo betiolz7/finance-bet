@@ -1,5 +1,6 @@
+import Link from "next/link";
 import { ActionForm, SubmitButton } from "@/components/forms";
-import { Card, Field, inputClass } from "@/components/ui";
+import { Card, Field, inputClass, textButtonClass } from "@/components/ui";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { signIn } from "./actions";
 
@@ -31,6 +32,12 @@ export default function LoginPage() {
             <SubmitButton className="inline-flex w-full items-center justify-center rounded-xl bg-ink px-4 py-2.5 text-sm font-medium text-on-ink disabled:opacity-60">
               Entrar
             </SubmitButton>
+            <p className="text-center text-sm text-muted">
+              Recebeu um convite?{" "}
+              <Link href="/cadastro" className={textButtonClass}>
+                Criar conta
+              </Link>
+            </p>
           </ActionForm>
         ) : (
           <p className="mt-4 text-sm text-muted">

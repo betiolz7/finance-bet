@@ -131,15 +131,20 @@ export default async function AccountsPage() {
 function AccountItem({ row }: { row: AccountRow }) {
   return (
     <li className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 py-3">
-      <div className="flex min-w-0 flex-1 basis-48 items-center gap-3">
+      <Link
+        href={`/contas/${row.id}`}
+        className="group flex min-w-0 flex-1 basis-48 items-center gap-3"
+      >
         <BankIcon institution={row} fallbackName={row.name} />
         <div className="min-w-0">
-          <p className="truncate text-sm font-medium">{row.name}</p>
+          <p className="truncate text-sm font-medium group-hover:underline">
+            {row.name} <span aria-hidden className="text-muted">›</span>
+          </p>
           <p className="text-xs text-muted">
-            {row.institution_name ?? ACCOUNT_KINDS[row.kind]}
+            {row.institution_name ?? ACCOUNT_KINDS[row.kind]} · ver extrato
           </p>
         </div>
-      </div>
+      </Link>
       <div className="text-right">
         <p className="whitespace-nowrap text-sm font-semibold tabular-nums">
           {formatCents(row.balance_cents)}

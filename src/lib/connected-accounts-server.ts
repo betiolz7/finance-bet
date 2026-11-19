@@ -6,17 +6,13 @@ import {
 } from "./connected-accounts";
 import { todayInBrazil } from "./dates";
 import { perItem } from "./per-item";
-import { getItem, listAccounts, pluggyItemIds } from "./pluggy";
+import { getItem, listAccounts } from "./pluggy";
 
+/** Conexões do usuário logado. A tabela só devolve as linhas dele. */
 export async function connectedItemIds(db: SupabaseClient): Promise<string[]> {
   const { data, error } = await db.from("bank_items").select("item_id");
   if (error) throw new Error(error.message);
-  return [
-    ...new Set([
-      ...pluggyItemIds(),
-      ...(data as { item_id: string }[]).map((row) => row.item_id),
-    ]),
-  ];
+  return (data as { item_id: string }[]).map((row) => row.item_id);
 }
 
 /**

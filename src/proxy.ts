@@ -11,7 +11,8 @@ export async function proxy(request: NextRequest) {
   // Pluggy e o agendador da Vercel chamam sem login; essas rotas têm senha própria.
   if (EXTERNAL_PATHS.includes(request.nextUrl.pathname)) return NextResponse.next();
 
-  const isLogin = request.nextUrl.pathname === "/login";
+  // Telas para quem ainda não entrou. Logado, a pessoa vai direto ao Dashboard.
+  const isLogin = ["/login", "/cadastro"].includes(request.nextUrl.pathname);
 
   if (!isSupabaseConfigured) {
     return isLogin

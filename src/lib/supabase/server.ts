@@ -36,3 +36,12 @@ export const requireDb = cache(async () => {
   if (!data?.claims) redirect("/login");
   return supabase;
 });
+
+/** Como requireDb, e também quem é o usuário logado. */
+export const requireUser = cache(async () => {
+  const db = await requireDb();
+  const { data } = await db.auth.getClaims();
+  if (!data?.claims) redirect("/login");
+  const email = typeof data.claims.email === "string" ? data.claims.email : null;
+  return { db, userId: data.claims.sub, email };
+});

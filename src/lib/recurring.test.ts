@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 import {
   generatedThroughOnResume,
   parseRecurringInput,
+  parseRecurringType,
   summarizeFixedCosts,
 } from "./recurring";
 import { createTestDb } from "./test-db";
@@ -61,6 +62,25 @@ describe("geração de custos fixos", () => {
         description: "Aluguel",
       },
     ]);
+  });
+
+  it("gera receita fixa como receita pendente", async () => {
+    await db.exec(`insert into recurring_rules
+      (description, amount_cents, due_day, category_id, account_id, start_month, type)
+      values ('Salário', 500000, 5, '${CATEGORY}', '${ACCOUNT}', '2026-11-01', 'income')`);
+    expect(await generate("2026-11-01")).toBe(1);
+    const { rows } = await db.query(
+      "select type, status, date::text from transactions",
+    );
+    expect(rows).toEqual([{ type: "income", status: "pending", date: "2026-11-05" }]);
+  });
+
+  it("rejeita tipo de fixo inválido", async () => {
+    await expect(
+      db.exec(`insert into recurring_rules
+        (description, amount_cents, due_day, category_id, account_id, start_month, type)
+        values ('X', 100, 5, '${CATEGORY}', '${ACCOUNT}', '2026-11-01', 'transfer')`),
+    ).rejects.toThrow(/check/);
   });
 
   it("usa o último dia quando o mês não tem o vencimento", async () => {
@@ -191,5 +211,17 @@ describe("funções auxiliares", () => {
         { status: "pending", amount_cents: 20 },
       ]),
     ).toEqual({ paidCents: 100, pendingCents: 50 });
+  });
+});
+
+describe("parseRecurringType", () => {
+  it.each([
+    ["receita", "income"],
+    ["income", "income"],
+    ["expense", "expense"],
+    [undefined, "expense"],
+    ["qualquer", "expense"],
+  ])("%j vira %s", (value, expected) => {
+    expect(parseRecurringType(value)).toBe(expected);
   });
 });

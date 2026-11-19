@@ -24,7 +24,10 @@ export async function POST() {
       clientId: process.env.PLUGGY_CLIENT_ID as string,
       clientSecret: process.env.PLUGGY_CLIENT_SECRET as string,
     });
-    const { accessToken } = await pluggy.createConnectToken();
+    // A conexão criada fica marcada com o usuário; saveBankItem confere isso.
+    const { accessToken } = await pluggy.createConnectToken(undefined, {
+      clientUserId: data.claims.sub,
+    });
     return Response.json({ accessToken });
   } catch {
     return Response.json({ error: "pluggy_error" }, { status: 502 });

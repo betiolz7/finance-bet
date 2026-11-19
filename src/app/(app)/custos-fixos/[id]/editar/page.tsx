@@ -2,12 +2,13 @@ import { notFound } from "next/navigation";
 import { ActionForm, SubmitButton } from "@/components/forms";
 import { Card, PageHeader } from "@/components/ui";
 import { centsToInput } from "@/lib/money";
+import { parseRecurringType } from "@/lib/recurring";
 import { requireDb } from "@/lib/supabase/server";
 import { loadFormOptions } from "../../../lancamentos/queries";
 import { updateRecurringRule } from "../../actions";
 import { RecurringFields } from "../../recurring-fields";
 
-export default async function EditFixedCostPage({
+export default async function EditFixedPage({
   params,
 }: {
   params: Promise<{ id: string }>;
@@ -16,19 +17,21 @@ export default async function EditFixedCostPage({
   const db = await requireDb();
   const { data } = await db
     .from("recurring_rules")
-    .select("description, amount_cents, due_day, category_id, account_id")
+    .select("type, description, amount_cents, due_day, category_id, account_id")
     .eq("id", id)
     .maybeSingle();
   if (!data) notFound();
 
   const { accounts, categories } = await loadFormOptions([data.account_id]);
+  const type = parseRecurringType(data.type);
 
   return (
     <div className="max-w-xl">
-      <PageHeader title="Editar custo fixo" />
+      <PageHeader title={type === "income" ? "Editar receita fixa" : "Editar gasto fixo"} />
       <Card>
         <ActionForm action={updateRecurringRule.bind(null, id)} className="space-y-4">
           <RecurringFields
+            type={type}
             accounts={accounts}
             categories={categories}
             initial={{

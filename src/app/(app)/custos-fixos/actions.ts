@@ -8,6 +8,7 @@ import {
   generatedThroughOnResume,
   monthToDate,
   parseRecurringInput,
+  parseRecurringType,
 } from "@/lib/recurring";
 import { requireDb } from "@/lib/supabase/server";
 
@@ -33,9 +34,10 @@ export async function createRecurringRule(
   const startMonth = monthToDate(String(formData.get("startMonth") ?? ""));
   if (!startMonth) return { error: "Escolha o primeiro mês." };
 
+  const type = parseRecurringType(String(formData.get("type") ?? ""));
   const { error } = await db
     .from("recurring_rules")
-    .insert({ ...parsed.data, start_month: startMonth });
+    .insert({ ...parsed.data, type, start_month: startMonth });
   if (error) return { error: describeDbError(error) };
 
   revalidatePath("/", "layout");

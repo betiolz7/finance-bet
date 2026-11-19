@@ -102,3 +102,28 @@ export function summarizeMonth(
   }
   return { incomeCents, expenseCents, balanceCents: incomeCents - expenseCents };
 }
+
+export interface AccountMonthSummary {
+  inCents: number;
+  outCents: number;
+  netCents: number;
+}
+
+/**
+ * Visão de extrato de uma conta: tudo o que entrou e saiu dela, incluindo
+ * transferências entre contas suas e pagamentos de fatura.
+ */
+export function summarizeAccountMonth(
+  rows: { type: string; amount_cents: number; to_account_id: string | null }[],
+  accountId: string,
+): AccountMonthSummary {
+  let inCents = 0;
+  let outCents = 0;
+  for (const row of rows) {
+    const incoming =
+      row.type === "income" || (row.type === "transfer" && row.to_account_id === accountId);
+    if (incoming) inCents += row.amount_cents;
+    else outCents += row.amount_cents;
+  }
+  return { inCents, outCents, netCents: inCents - outCents };
+}

@@ -70,6 +70,13 @@ export function generatedThroughOnResume(
     : previous;
 }
 
+export type RecurringType = "income" | "expense";
+
+/** Lê o tipo vindo do formulário ou da URL ("receita" / "income"). Padrão: gasto. */
+export function parseRecurringType(value: string | null | undefined): RecurringType {
+  return value === "income" || value === "receita" ? "income" : "expense";
+}
+
 export interface FixedCostSummary {
   paidCents: number;
   pendingCents: number;

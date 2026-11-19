@@ -9,6 +9,24 @@ import {
   sendEmail,
 } from "@/lib/notifications";
 import { getAccount, listTransactions } from "@/lib/pluggy";
+import { createAdminClient, isOwnerEmail } from "@/lib/supabase/admin";
+
+/**
+ * O e-mail de aviso vai para NOTIFY_EMAIL_TO, o dono do app. Por isso só sai
+ * para conexões dele; entradas de outros usuários nunca chegam a esse e-mail.
+ */
+async function belongsToOwner(itemId: string): Promise<boolean> {
+  const admin = createAdminClient();
+  if (!admin) return false;
+  const { data, error } = await admin
+    .from("bank_items")
+    .select("user_id")
+    .eq("item_id", itemId)
+    .maybeSingle();
+  if (error || !data) return false;
+  const { data: user } = await admin.auth.admin.getUserById(data.user_id as string);
+  return isOwnerEmail(user.user?.email);
+}
 
 interface WebhookPayload {
   event?: string;
@@ -49,6 +67,7 @@ export async function POST(request: Request) {
       // Os dados vêm direto da Pluggy, e não do corpo do aviso.
       const account = await getAccount(accountId);
       if (account.type !== "BANK") return;
+      if (!(await belongsToOwner(account.itemId))) return;
 
       const dateFrom =
         transactionsMinDate?.slice(0, 10) ??

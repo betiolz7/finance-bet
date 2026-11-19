@@ -293,6 +293,7 @@ async function answerParsed(
           .from("recurring_rules")
           .select("description, amount_cents, due_day")
           .eq("active", true)
+          .eq("type", "expense")
           .order("amount_cents", { ascending: false }),
         loadTransactions(db, { start: since, end: addDays(today, 1), label: "" }),
       ]);
@@ -311,11 +312,11 @@ async function answerParsed(
         summary:
           ruleRows.length + detected.length === 0
             ? "Não encontrei gastos recorrentes nos últimos meses."
-            : `Somam cerca de ${formatCents(total)} por mês: ${plural(ruleRows.length, "custo fixo cadastrado", "custos fixos cadastrados")} e ${plural(detected.length, "repetição encontrada", "repetições encontradas")} nos lançamentos.`,
+            : `Somam cerca de ${formatCents(total)} por mês: ${plural(ruleRows.length, "gasto fixo cadastrado", "gastos fixos cadastrados")} e ${plural(detected.length, "repetição encontrada", "repetições encontradas")} nos lançamentos.`,
         rows: [
           ...ruleRows.map((rule) => ({
             label: rule.description,
-            detail: `Custo fixo · vence dia ${rule.due_day}`,
+            detail: `Gasto fixo · vence dia ${rule.due_day}`,
             cents: rule.amount_cents,
             tone: "expense" as const,
           })),
@@ -326,7 +327,7 @@ async function answerParsed(
             tone: "expense" as const,
           })),
         ],
-        link: { label: "Ver custos fixos", href: "/custos-fixos" },
+        link: { label: "Ver fixos", href: "/custos-fixos" },
       };
     }
 

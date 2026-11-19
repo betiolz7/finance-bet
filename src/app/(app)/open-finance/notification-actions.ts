@@ -14,12 +14,21 @@ import {
   webhookUrl,
 } from "@/lib/notifications";
 import { createWebhook, listWebhooks } from "@/lib/pluggy";
-import { requireDb } from "@/lib/supabase/server";
+import { isOwnerEmail } from "@/lib/supabase/admin";
+import { requireUser } from "@/lib/supabase/server";
+
+const OWNER_ONLY = "Só o dono do app pode configurar os avisos por e-mail.";
+
+/** Os e-mails vão para o dono do app; outros usuários não mexem neles. */
+async function requireOwner() {
+  const user = await requireUser();
+  return isOwnerEmail(user.email) ? user : null;
+}
 
 const EVENT = "transactions/created";
 
 export async function activateNotifications(): Promise<ActionState> {
-  await requireDb();
+  if (!(await requireOwner())) return { error: OWNER_ONLY };
   const config = notificationsConfig();
   const url = webhookUrl(config.appUrl);
 
@@ -47,12 +56,13 @@ export async function activateNotifications(): Promise<ActionState> {
 }
 
 export async function sendMonthlySummaryNow(): Promise<ActionState> {
-  const db = await requireDb();
+  const owner = await requireOwner();
+  if (!owner) return { error: OWNER_ONLY };
   if (!isEmailConfigured()) return { error: "Configure o e-mail antes de enviar." };
 
   const month = shiftMonth(todayInBrazil().slice(0, 7), -1);
   try {
-    const summary = await collectMonthlySummary(db, month);
+    const summary = await collectMonthlySummary(owner.db, month, owner.userId);
     await sendEmail(buildSummaryEmail(summary, notificationsConfig().appUrl));
   } catch {
     return { error: "O resumo não foi enviado. Tente novamente." };
@@ -61,7 +71,7 @@ export async function sendMonthlySummaryNow(): Promise<ActionState> {
 }
 
 export async function sendTestEmail(): Promise<ActionState> {
-  await requireDb();
+  if (!(await requireOwner())) return { error: OWNER_ONLY };
   if (!isEmailConfigured()) return { error: "Configure o e-mail antes de testar." };
 
   const message = buildCreditEmail(

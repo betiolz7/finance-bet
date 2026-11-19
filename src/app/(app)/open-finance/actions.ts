@@ -20,14 +20,25 @@ import {
   isPluggyConfigured,
   listTransactions,
 } from "@/lib/pluggy";
-import { requireDb } from "@/lib/supabase/server";
+import { requireDb, requireUser } from "@/lib/supabase/server";
 
 export async function saveBankItem(itemId: string): Promise<ActionState> {
-  const db = await requireDb();
+  const { db, userId } = await requireUser();
+
+  // O id chega do navegador. Só aceita conexão já salva por este usuário ou
+  // criada pelo Connect Token dele; assim ninguém pega a conexão de outra pessoa.
+  const { data: owned, error: ownedError } = await db
+    .from("bank_items")
+    .select("item_id")
+    .eq("item_id", itemId)
+    .maybeSingle();
+  if (ownedError) return { error: describeDbError(ownedError) };
 
   try {
-    // Confirma que a conexão existe e pertence a estas credenciais da Pluggy.
-    await getItem(itemId);
+    const item = await getItem(itemId);
+    if (!owned && item.clientUserId !== userId) {
+      return { error: "Esta conexão não pertence à sua conta." };
+    }
   } catch {
     return { error: "A Pluggy não confirmou esta conexão." };
   }

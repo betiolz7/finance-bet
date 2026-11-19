@@ -3,9 +3,23 @@ import { join } from "node:path";
 import { expect, it } from "vitest";
 import { createTestDb } from "./test-db";
 
-it("o script de limpeza apaga tudo sem violar vínculos e mantém o que deve", async () => {
+it("o script de limpeza apaga só o usuário escolhido, sem violar vínculos", async () => {
   const owner = "11111111-1111-1111-1111-111111111111";
-  const { db, actAs } = await createTestDb([owner]);
+  const other = "22222222-2222-2222-2222-222222222222";
+  const { db, actAs } = await createTestDb([owner, other]);
+  await db.exec(`
+    alter table auth.users add column email text;
+    update auth.users set email = 'dono@exemplo.com' where id = '${owner}';
+    update auth.users set email = 'testador@exemplo.com' where id = '${other}';
+  `);
+
+  // Dados de outro usuário: precisam sobreviver à limpeza.
+  await actAs(other);
+  await db.exec(`
+    insert into accounts (name, kind) values ('Conta do testador', 'checking');
+    reset role;
+  `);
+
   await actAs(owner);
   await db.exec(`
     insert into accounts (id, name, kind) values ('aaaaaaaa-0000-0000-0000-000000000001', 'Conta', 'checking');
@@ -35,7 +49,11 @@ it("o script de limpeza apaga tudo sem violar vínculos e mantém o que deve", a
     "utf8",
   );
   const cleanup = script.slice(script.indexOf("begin;"));
-  await db.exec(cleanup);
+  expect(cleanup).toContain("SEU-EMAIL@exemplo.com");
+  // Sem trocar o e-mail, o script para em vez de apagar.
+  await expect(db.exec(cleanup)).rejects.toThrow(/E-mail não encontrado/);
+  await db.exec("rollback");
+  await db.exec(cleanup.replaceAll("SEU-EMAIL@exemplo.com", "dono@exemplo.com"));
 
   const count = async (table: string) =>
     (await db.query<{ n: number }>(`select count(*)::int as n from ${table}`)).rows[0].n;
@@ -43,8 +61,9 @@ it("o script de limpeza apaga tudo sem violar vínculos e mantém o que deve", a
     "transactions", "imports", "invoices", "credit_cards", "accounts",
     "recurring_rules", "goals", "bank_transactions", "bank_links",
   ]) {
-    expect(await count(table), table).toBe(0);
+    expect(await count(`${table} where user_id = '${owner}'`), table).toBe(0);
   }
+  expect(await count(`accounts where user_id = '${other}'`)).toBe(1);
   expect(await count("categories")).toBe(1);
   expect(await count("budgets")).toBe(1);
   expect(await count("bank_items")).toBe(1);

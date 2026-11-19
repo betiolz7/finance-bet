@@ -23,6 +23,8 @@ export interface PluggyItem {
   nextAutoSyncAt?: string | null;
   consentExpiresAt?: string | null;
   connector?: { name?: string } | null;
+  /** Usuário do app que criou a conexão (enviado no Connect Token). */
+  clientUserId?: string | null;
 }
 
 export interface PluggyAccount {
@@ -102,13 +104,6 @@ export interface PluggyInvestment {
   issuer?: string | null;
   status?: string | null;
   institution?: { name?: string | null } | null;
-}
-
-export function pluggyItemIds(): string[] {
-  return (process.env.PLUGGY_ITEM_IDS ?? "")
-    .split(",")
-    .map((id) => id.trim())
-    .filter(Boolean);
 }
 
 export function isPluggyConfigured(): boolean {

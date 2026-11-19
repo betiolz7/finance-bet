@@ -9,6 +9,7 @@ import {
 import { centsToInput, parseMoneyToCents } from "./money";
 import {
   parseTransactionInput,
+  summarizeAccountMonth,
   summarizeMonth,
   type TransactionFields,
 } from "./transactions";
@@ -138,5 +139,23 @@ describe("summarizeMonth", () => {
         { type: "transfer", amount_cents: 500 },
       ]),
     ).toEqual({ incomeCents: 1000, expenseCents: 300, balanceCents: 700 });
+  });
+});
+
+describe("summarizeAccountMonth", () => {
+  const ME = "conta-a";
+  it("conta transferências e faturas como entrada ou saída da conta", () => {
+    expect(
+      summarizeAccountMonth(
+        [
+          { type: "income", amount_cents: 1000, to_account_id: null },
+          { type: "expense", amount_cents: 300, to_account_id: null },
+          { type: "transfer", amount_cents: 200, to_account_id: ME },
+          { type: "transfer", amount_cents: 50, to_account_id: "conta-b" },
+          { type: "invoice_payment", amount_cents: 400, to_account_id: null },
+        ],
+        ME,
+      ),
+    ).toEqual({ inCents: 1200, outCents: 750, netCents: 450 });
   });
 });

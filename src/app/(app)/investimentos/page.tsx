@@ -8,7 +8,8 @@ import {
   type Investment,
 } from "@/lib/investments";
 import { formatCents } from "@/lib/money";
-import { isPluggyConfigured, listInvestments, pluggyItemIds } from "@/lib/pluggy";
+import { connectedItemIds } from "@/lib/connected-accounts-server";
+import { isPluggyConfigured, listInvestments } from "@/lib/pluggy";
 import { perItem } from "@/lib/per-item";
 import { requireDb } from "@/lib/supabase/server";
 
@@ -36,14 +37,7 @@ export default async function InvestmentsPage() {
     );
   }
 
-  const stored = await db.from("bank_items").select("item_id");
-  if (stored.error) throw new Error(stored.error.message);
-  const itemIds = [
-    ...new Set([
-      ...pluggyItemIds(),
-      ...(stored.data as { item_id: string }[]).map((row) => row.item_id),
-    ]),
-  ];
+  const itemIds = await connectedItemIds(db);
 
   // Uma conexão com problema não esconde os investimentos das outras.
   const fetched = await perItem(itemIds, listInvestments);
