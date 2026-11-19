@@ -150,3 +150,24 @@ export function upcomingBills(
   ];
   return bills.sort((a, b) => a.dueDate.localeCompare(b.dueDate));
 }
+
+/**
+ * Extrato do banco no formato do gráfico: crédito é entrada, débito é saída.
+ * Só conta movimentos de contas bancárias; o cartão não mexe no saldo da conta.
+ */
+export function bankMovements(
+  rows: {
+    direction: "credit" | "debit";
+    amount_cents: number;
+    date: string;
+    link: { account_id: string | null } | null;
+  }[],
+): { type: "income" | "expense"; amount_cents: number; date: string }[] {
+  return rows
+    .filter((row) => row.link?.account_id)
+    .map((row) => ({
+      type: row.direction === "credit" ? "income" : "expense",
+      amount_cents: row.amount_cents,
+      date: row.date,
+    }));
+}

@@ -9,7 +9,7 @@ function weekday(iso: string): string {
   return WEEKDAYS[new Date(Date.UTC(year, month - 1, day)).getUTCDay()];
 }
 
-/** Receitas acima da linha do zero e despesas abaixo, um par de barras por dia. */
+/** Entradas acima da linha do zero e saídas abaixo, um par de barras por dia. */
 export function OverviewChart({ points }: { points: DailyPoint[] }) {
   const maxIncome = Math.max(0, ...points.map((p) => p.incomeCents));
   const maxExpense = Math.max(0, ...points.map((p) => p.expenseCents));
@@ -18,7 +18,7 @@ export function OverviewChart({ points }: { points: DailyPoint[] }) {
   if (range === 0) {
     return (
       <p className="flex h-[240px] items-center justify-center text-sm text-muted">
-        Nenhuma receita ou despesa nestes 7 dias.
+        Nenhuma movimentação nas contas do banco nestes 7 dias.
       </p>
     );
   }
@@ -30,7 +30,7 @@ export function OverviewChart({ points }: { points: DailyPoint[] }) {
   return (
     <figure>
       <figcaption className="sr-only">
-        Receitas e despesas por dia nos últimos 7 dias
+        Entradas e saídas nas contas do banco por dia, nos últimos 7 dias
       </figcaption>
       <div className="relative ml-16 h-[220px]">
         <GridLine top="0%" label={formatCompactCents(maxIncome)} />
@@ -43,7 +43,7 @@ export function OverviewChart({ points }: { points: DailyPoint[] }) {
               key={point.date}
               tabIndex={0}
               className="group relative flex-1 outline-none"
-              aria-label={`${formatDate(point.date)}: receitas ${formatCents(point.incomeCents)}, despesas ${formatCents(point.expenseCents)}`}
+              aria-label={`${formatDate(point.date)}: entradas ${formatCents(point.incomeCents)}, saídas ${formatCents(point.expenseCents)}`}
             >
               <div
                 className="hatch absolute inset-x-[18%] rounded-t bg-bar-income"
@@ -57,14 +57,14 @@ export function OverviewChart({ points }: { points: DailyPoint[] }) {
                 <p className="mb-1 text-muted">{formatDate(point.date)}</p>
                 <p className="flex items-center gap-2">
                   <span className="size-2 rounded-full bg-bar-income" aria-hidden />
-                  Receitas
+                  Entradas
                   <span className="ml-auto pl-3 font-medium tabular-nums">
                     {formatCents(point.incomeCents)}
                   </span>
                 </p>
                 <p className="flex items-center gap-2">
                   <span className="size-2 rounded-full bg-bar-expense" aria-hidden />
-                  Despesas
+                  Saídas
                   <span className="ml-auto pl-3 font-medium tabular-nums">
                     {formatCents(point.expenseCents)}
                   </span>
@@ -109,11 +109,11 @@ export function ChartLegend() {
     <div className="flex items-center gap-4 text-sm">
       <span className="flex items-center gap-1.5">
         <span className="size-2.5 rounded-sm bg-bar-income" aria-hidden />
-        Receitas
+        Entradas
       </span>
       <span className="flex items-center gap-1.5">
         <span className="size-2.5 rounded-sm bg-bar-expense" aria-hidden />
-        Despesas
+        Saídas
       </span>
     </div>
   );

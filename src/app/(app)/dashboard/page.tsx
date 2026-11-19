@@ -18,6 +18,7 @@ import { Card, EmptyState, textButtonClass } from "@/components/ui";
 import { nextInvoiceToPay, usedLimitCents } from "@/lib/cards";
 import {
   budgetLevel,
+  bankMovements,
   dailySeries,
   effectiveBudgets,
   percentChange,
@@ -120,10 +121,10 @@ export default async function DashboardPage({
       .in("type", ["income", "expense"])
       .gte("date", previous.start)
       .lt("date", previous.end),
+    // O gráfico mostra o extrato do banco, não os lançamentos feitos no app.
     db
-      .from("transactions")
-      .select("type, amount_cents, date")
-      .in("type", ["income", "expense"])
+      .from("bank_transactions")
+      .select("direction, amount_cents, date, link:bank_links(account_id)")
       .gte("date", chartDays[0])
       .lte("date", chartEnd),
     db.from("account_balances").select("id, balance_cents, archived"),
@@ -176,7 +177,7 @@ export default async function DashboardPage({
   const summary = summarizeMonth(rows);
   const previousSummary = summarizeMonth(previousResult.data ?? []);
   const points = dailySeries(
-    (chartResult.data ?? []) as { type: string; amount_cents: number; date: string }[],
+    bankMovements((chartResult.data ?? []) as unknown as Parameters<typeof bankMovements>[0]),
     chartDays,
   );
 

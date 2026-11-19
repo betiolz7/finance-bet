@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   budgetLevel,
+  bankMovements,
   dailySeries,
   effectiveBudgets,
   percentChange,
@@ -142,5 +143,18 @@ describe("tabela de orçamentos", () => {
 
     await actAs(OTHER);
     expect((await db.query("select * from budgets")).rows).toEqual([]);
+  });
+});
+
+describe("bankMovements", () => {
+  it("usa só o extrato das contas do banco, sem o cartão", () => {
+    const rows = [
+      { direction: "credit", amount_cents: 1000, date: "2026-11-18", link: { account_id: "a" } },
+      { direction: "debit", amount_cents: 300, date: "2026-11-18", link: { account_id: "a" } },
+      { direction: "debit", amount_cents: 999, date: "2026-11-18", link: { account_id: null } },
+    ] as const;
+    expect(dailySeries(bankMovements([...rows]), ["2026-11-18"])).toEqual([
+      { date: "2026-11-18", incomeCents: 1000, expenseCents: 300 },
+    ]);
   });
 });
