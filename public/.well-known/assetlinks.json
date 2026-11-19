@@ -1,0 +1,12 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.betiol.financebet",
+      "sha256_cert_fingerprints": [
+        "65:BD:DD:F4:0C:40:A1:8F:32:D3:74:5E:CA:32:20:BE:83:F8:06:C1:C8:6C:2D:0A:9F:67:34:97:4A:35:89:A8"
+      ]
+    }
+  }
+]

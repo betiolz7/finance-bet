@@ -54,7 +54,8 @@ export async function proxy(request: NextRequest) {
 
 export const config = {
   // Manifesto e ícones ficam fora do login: o celular os busca sem sessão para instalar o app.
+  // .well-known/assetlinks.json prova ao Android que o APK é deste site (abre sem barra do Chrome).
   matcher: [
-    "/((?!_next/static|_next/image|favicon.ico|manifest.webmanifest|icon|apple-icon|.*\\.(?:svg|png|webp|ico)$).*)",
+    "/((?!_next/static|_next/image|favicon.ico|manifest.webmanifest|icon|apple-icon|\\.well-known/|.*\\.(?:svg|png|webp|ico)$).*)",
   ],
 };

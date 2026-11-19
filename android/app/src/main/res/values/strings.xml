@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="appName">finance-bet</string>
+    <string name="launchUrl">https://finance-bet-amber.vercel.app/dashboard</string>
+    <!-- Precisa bater com public/.well-known/assetlinks.json do site. -->
+    <string name="assetStatements" translatable="false">
+        [{\"relation\": [\"delegate_permission/common.handle_all_urls\"],
+          \"target\": {\"namespace\": \"web\", \"site\": \"https://finance-bet-amber.vercel.app\"}}]
+    </string>
+</resources>

@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Mesmas cores do src/app/manifest.ts -->
+    <color name="themeColor">#141414</color>
+    <color name="backgroundColor">#F4F4F2</color>
+</resources>
