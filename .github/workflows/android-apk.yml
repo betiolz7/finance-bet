@@ -1,0 +1,62 @@
+# Gera o APK Android (abre o site publicado em tela cheia) e publica como Release.
+# Baixar no celular: https://github.com/betiolz7/finance-bet/releases/latest
+#
+# Secrets necessários (Settings > Secrets and variables > Actions):
+#   ANDROID_KEYSTORE_BASE64   - arquivo finance-bet.p12 em base64
+#   ANDROID_KEYSTORE_PASSWORD - senha do arquivo e da chave
+name: APK Android
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - "android/**"
+      - ".github/workflows/android-apk.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.11.1"
+
+      - name: Preparar chave de assinatura
+        env:
+          KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+        run: |
+          echo "$KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/finance-bet.p12"
+          echo "ANDROID_KEYSTORE_PATH=$RUNNER_TEMP/finance-bet.p12" >> "$GITHUB_ENV"
+
+      - name: Gerar APK
+        env:
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+        run: gradle -p android assembleRelease --no-daemon
+
+      - name: Renomear APK
+        run: cp android/app/build/outputs/apk/release/app-release.apk finance-bet.apk
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: finance-bet-apk
+          path: finance-bet.apk
+
+      - name: Publicar Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "apk-${{ github.run_number }}" finance-bet.apk \
+            --target "${{ github.sha }}" \
+            --title "finance-bet APK 1.0.${{ github.run_number }}" \
+            --notes "Instale no Android. Abre https://finance-bet-amber.vercel.app em tela cheia." \
+            --latest
