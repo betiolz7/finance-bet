@@ -24,7 +24,7 @@ import {
   LISTED_TRANSACTION_SELECT,
   TransactionItem,
   type ListedTransaction,
-} from "../../lancamentos/transaction-item";
+} from "../../../lancamentos/transaction-item";
 import { ACCOUNT_KINDS } from "../account-fields";
 
 interface AccountDetail extends Institution {

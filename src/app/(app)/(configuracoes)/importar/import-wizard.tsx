@@ -24,7 +24,7 @@ import {
 } from "@/lib/import";
 import { categoryFromRules, type CategoryRule } from "@/lib/category-rules";
 import { formatCents } from "@/lib/money";
-import type { CategoryOption, Option } from "../lancamentos/transaction-form";
+import type { CategoryOption, Option } from "../../lancamentos/transaction-form";
 import { confirmImport } from "./actions";
 
 const MAX_FILE_BYTES = 5 * 1024 * 1024;

@@ -10,7 +10,7 @@ import {
 } from "@/lib/open-finance";
 import { ensureRecurringGenerated } from "@/lib/recurring-server";
 import { requireDb } from "@/lib/supabase/server";
-import { loadFormOptions } from "../../lancamentos/queries";
+import { loadFormOptions } from "../../../lancamentos/queries";
 import { reopenBankTransaction } from "../actions";
 import { ReviewList } from "./review-list";
 

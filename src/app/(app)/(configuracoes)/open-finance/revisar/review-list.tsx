@@ -5,7 +5,7 @@ import { inputClass, primaryButtonClass } from "@/components/ui";
 import { formatDate } from "@/lib/dates";
 import { formatCents } from "@/lib/money";
 import type { ReviewItem } from "@/lib/open-finance";
-import type { CategoryOption } from "../../lancamentos/transaction-form";
+import type { CategoryOption } from "../../../lancamentos/transaction-form";
 import { applyReview } from "../actions";
 
 interface Decision {

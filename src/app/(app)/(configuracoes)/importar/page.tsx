@@ -5,7 +5,7 @@ import type { CategoryRule } from "@/lib/category-rules";
 import type { ExpenseHistoryItem } from "@/lib/import";
 import { formatCents } from "@/lib/money";
 import { requireDb } from "@/lib/supabase/server";
-import { loadActiveCards, loadFormOptions } from "../lancamentos/queries";
+import { loadActiveCards, loadFormOptions } from "../../lancamentos/queries";
 import { undoImport } from "./actions";
 import { ImportWizard } from "./import-wizard";
 

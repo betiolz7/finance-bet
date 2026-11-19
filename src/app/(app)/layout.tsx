@@ -108,7 +108,7 @@ async function TopBarActions() {
           <span className="absolute top-2.5 right-2.5 size-2 rounded-full bg-expense" aria-hidden />
         )}
       </Link>
-      <Link href="/categorias" className={iconButton} aria-label="Configurações">
+      <Link href="/configuracoes" className={iconButton} aria-label="Configurações">
         <Settings className="size-5" strokeWidth={1.6} aria-hidden />
       </Link>
       <div className="hidden items-center gap-2.5 rounded-xl bg-surface py-1.5 pr-4 pl-1.5 lg:flex">

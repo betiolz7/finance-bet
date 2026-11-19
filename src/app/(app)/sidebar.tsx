@@ -14,7 +14,7 @@ import {
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState, useSyncExternalStore } from "react";
-import { MAIN_NAV, SECONDARY_NAV, isActive, type NavItem } from "./navigation";
+import { MAIN_NAV, SECONDARY_NAV, isActive, isItemActive, type NavItem } from "./navigation";
 
 const STORAGE_KEY = "finance-bet:sidebar-collapsed";
 
@@ -66,7 +66,7 @@ export function Sidebar({
   const renderItem = (item: NavItem) => {
     const Icon = item.icon;
     const active =
-      isActive(pathname, item.href) &&
+      isItemActive(pathname, item) &&
       !item.children?.some((child) => isActive(pathname, child.href));
     return (
       <li key={item.href}>
@@ -83,6 +83,14 @@ export function Sidebar({
           )}
           <Icon className="size-5 shrink-0" strokeWidth={1.6} aria-hidden />
           {!collapsed && <span>{item.label}</span>}
+          {item.badge === "review" && reviewCount > 0 &&
+            (collapsed ? (
+              <span className="absolute top-1.5 right-2 size-2 rounded-full bg-expense" aria-hidden />
+            ) : (
+              <span className="ml-auto rounded-full bg-ink px-1.5 text-[11px] font-semibold text-on-ink tabular-nums">
+                {reviewCount}
+              </span>
+            ))}
         </Link>
 
         {item.children && !collapsed && (
@@ -200,8 +208,9 @@ export function MobileTabBar({
     return () => window.removeEventListener("keydown", onKey);
   }, [open]);
 
-  const moreItems = [
-    ...MAIN_NAV.flatMap((item) => [item, ...(item.children ?? [])]),
+  type MoreItem = NavItem | NonNullable<NavItem["children"]>[number];
+  const moreItems: MoreItem[] = [
+    ...MAIN_NAV.flatMap((item): MoreItem[] => [item, ...(item.children ?? [])]),
     ...SECONDARY_NAV,
   ].filter((item) => !tabPaths.includes(item.href));
 
@@ -218,8 +227,11 @@ export function MobileTabBar({
           <div className="absolute inset-x-3 bottom-28 rounded-3xl bg-surface p-3 shadow-xl">
             <ul className="grid grid-cols-3 gap-1">
               {moreItems.map((item) => {
-                const Icon = "icon" in item ? item.icon : null;
-                const active = isActive(pathname, item.href);
+                const navItem = "icon" in item ? item : null;
+                const Icon = navItem?.icon ?? null;
+                const active = navItem
+                  ? isItemActive(pathname, navItem)
+                  : isActive(pathname, item.href);
                 return (
                   <li key={item.href}>
                     <Link
